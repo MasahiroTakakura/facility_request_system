@@ -4,29 +4,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_POST['username'];
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
 
-    // Include the database configuration file
+    // データベース接続
     require_once 'config.php';
-
-    // Get the database connection
     $conn = get_db_connection();
 
-    // Prepare an SQL statement with placeholders
     $sql = "INSERT INTO users (userid, username, password, is_admin) VALUES (?, ?, ?, 0)";
     $stmt = $conn->prepare($sql);
-
-    // Bind the actual values to the placeholders
     $stmt->bind_param('sss', $userid, $username, $password);
 
-    // Execute the statement
     if ($stmt->execute()) {
-        // Registration successful
         echo "<script>alert('登録が完了しました'); window.location.href='login.php';</script>";
-        exit();
     } else {
-        echo "Error: " . $stmt->error;
+        echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
     }
 
-    // Close the statement and connection
     $stmt->close();
     $conn->close();
 }
@@ -35,33 +26,67 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <title>User Registration</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ユーザー登録</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            margin-top: 50px;
+        }
+        .form-group label {
+            font-weight: bold;
+        }
+        .btn-block {
+            margin-top: 20px;
+        }
+        .navbar-brand, .nav-link {
+            font-weight: bold;
+        }
+    </style>
 </head>
 <body>
-    <div class="container mt-5">
+    <nav class="navbar navbar-expand-lg navbar-light bg-light">
+        <a class="navbar-brand" href="#">施設リクエストシステム</a>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ml-auto">
+                <li class="nav-item">
+                    <a class="nav-link" href="login.php">ログイン</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <div class="container">
         <div class="row justify-content-center">
-            <div class="col-md-6">
+            <div class="col-md-8">
                 <h2 class="text-center">ユーザー登録</h2>
                 <form method="post" action="register_user.php">
                     <div class="form-group">
                         <label for="userid">ユーザーID</label>
-                        <input type="text" class="form-control" name="userid" required>
+                        <input type="text" class="form-control" name="userid" id="userid" required>
                     </div>
                     <div class="form-group">
                         <label for="username">ユーザー名</label>
-                        <input type="text" class="form-control" name="username" required>
+                        <input type="text" class="form-control" name="username" id="username" required>
                     </div>
                     <div class="form-group">
                         <label for="password">パスワード</label>
-                        <input type="password" class="form-control" name="password" required>
+                        <input type="password" class="form-control" name="password" id="password" required>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">登録</button>
+                    <button type="submit" class="btn btn-primary btn-block">新規登録</button>
                 </form>
+                <div class="text-center mt-3">
+                    <a href="login.php" class="btn btn-secondary">ログイン</a>
+                </div>
             </div>
         </div>
     </div>
-    
+
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
