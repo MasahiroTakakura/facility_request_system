@@ -15,7 +15,10 @@ if ($conn->connect_error) {
     die("Connection failed: " . $conn->connect_error);
 }
 
-$sql = "SELECT * FROM requests WHERE username=?";
+$sql = "SELECT requests.id, facilities.name AS facility, requests.usage_dates, requests.usage_start_times, requests.usage_end_times, requests.reason, requests.status 
+        FROM requests 
+        JOIN facilities ON requests.facility_id = facilities.id 
+        WHERE requests.username = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param('s', $username);
 $stmt->execute();
@@ -100,10 +103,10 @@ $result = $stmt->get_result();
             <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
         </div>
     </div>
-    
+
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-    <script src="https://stackpath.amazonaws.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
 
