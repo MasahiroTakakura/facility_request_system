@@ -17,20 +17,21 @@ $result = $conn->query($sql);
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_SESSION['username'];
     $facility_id = $_POST['facility_id'];
-    $usage_dates = implode(",", $_POST['usage_dates']);
-    $usage_start_times = implode(",", $_POST['usage_start_times']);
-    $usage_end_times = implode(",", $_POST['usage_end_times']);
+    $usage_dates = $_POST['usage_dates'];
+    $usage_start_times = $_POST['usage_start_times'];
+    $usage_end_times = $_POST['usage_end_times'];
     $reason = $_POST['reason'];
 
-    $sql = "INSERT INTO requests (username, facility_id, usage_dates, usage_start_times, usage_end_times, reason) VALUES (?, ?, ?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('sissss', $username, $facility_id, $usage_dates, $usage_start_times, $usage_end_times, $reason);
-
-    if ($stmt->execute()) {
-        echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
-    } else {
-        echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
+    // リクエストごとにレコードを追加
+    $stmt = $conn->prepare("INSERT INTO requests (username, facility_id, usage_dates, usage_start_times, usage_end_times, reason) VALUES (?, ?, ?, ?, ?, ?)");
+    foreach ($usage_dates as $index => $usage_date) {
+        $usage_start_time = $usage_start_times[$index];
+        $usage_end_time = $usage_end_times[$index];
+        $stmt->bind_param('sissss', $username, $facility_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
+        $stmt->execute();
     }
+    
+    echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
 
     $stmt->close();
     $conn->close();
