@@ -5,35 +5,49 @@ if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION
     exit();
 }
 
+require_once 'config.php';
+$conn = get_db_connection();
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $facility_name = $_POST['facility_name'];
+    if (isset($_POST['facility_name'])) {
+        // 施設の登録
+        $facility_name = $_POST['facility_name'];
+        $sql = "INSERT INTO facilities (name) VALUES (?)";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('s', $facility_name);
 
-    // データベース設定ファイルを読み込む
-    require_once 'config.php';
+        if ($stmt->execute()) {
+            echo "<script>alert('施設が正常に登録されました');</script>";
+        } else {
+            echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
+        }
 
-    // データベース接続を取得
-    $conn = get_db_connection();
+        $stmt->close();
+    } elseif (isset($_POST['delete_facility_id'])) {
+        // 施設の削除
+        $delete_facility_id = $_POST['delete_facility_id'];
+        $sql = "DELETE FROM facilities WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('i', $delete_facility_id);
 
-    $sql = "INSERT INTO facilities (name) VALUES (?)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('s', $facility_name);
+        if ($stmt->execute()) {
+            echo "<script>alert('施設が正常に削除されました');</script>";
+        } else {
+            echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
+        }
 
-    if ($stmt->execute()) {
-        echo "<script>alert('施設が正常に登録されました'); window.location.href='admin_dashboard.php';</script>";
-    } else {
-        echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
+        $stmt->close();
     }
-
-    $stmt->close();
-    $conn->close();
 }
+
+// 施設の一覧を取得
+$sql = "SELECT * FROM facilities";
+$facilities = $conn->query($sql);
 ?>
 
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>施設登録</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -41,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             background-color: #f8f9fa;
         }
         .container {
-            max-width: 600px;
+            max-width: 800px;
             margin-top: 50px;
         }
         .form-group label {
@@ -61,6 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
+                    <a class="nav-link" href="admin_dashboard.php">管理者ダッシュボードへ</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="logout.php">ログアウト</a>
                 </li>
             </ul>
@@ -70,10 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-md-8">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="text-center w-100">施設登録</h2>
-                    <a href="admin_dashboard.php" class="btn btn-secondary">管理者ダッシュボードへ</a>
-                </div>
+                <h2 class="text-center">施設登録</h2>
                 <form method="post" action="register_facility.php">
                     <div class="form-group">
                         <label for="facility_name">施設名</label>
@@ -81,6 +95,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                     <button type="submit" class="btn btn-primary btn-block">登録</button>
                 </form>
+                <h2 class="text-center mt-5">施設一覧</h2>
+                <table class="table table-bordered mt-3">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>施設名</th>
+                            <th>アクション</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php while ($row = $facilities->fetch_assoc()): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($row['id']); ?></td>
+                            <td><?php echo htmlspecialchars($row['name']); ?></td>
+                            <td>
+                                <form method="post" action="register_facility.php" style="display:inline;">
+                                    <input type="hidden" name="delete_facility_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                                    <button type="submit" class="btn btn-danger btn-sm">削除</button>
+                                </form>
+                            </td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
@@ -90,3 +128,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
+
+<?php
+$conn->close();
+?>
