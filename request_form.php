@@ -11,23 +11,23 @@ require_once 'config.php';
 // データベース接続を取得
 $conn = get_db_connection();
 
-$sql = "SELECT * FROM facilities";
-$result = $conn->query($sql);
+$sql = "SELECT * FROM buildings";
+$buildings = $conn->query($sql);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_SESSION['username'];
-    $facility_id = $_POST['facility_id'];
+    $room_id = $_POST['room_id'];
     $usage_dates = $_POST['usage_dates'];
     $usage_start_times = $_POST['usage_start_times'];
     $usage_end_times = $_POST['usage_end_times'];
     $reason = $_POST['reason'];
 
     // リクエストごとにレコードを追加
-    $stmt = $conn->prepare("INSERT INTO requests (username, facility_id, usage_dates, usage_start_times, usage_end_times, reason) VALUES (?, ?, ?, ?, ?, ?)");
+    $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')");
     foreach ($usage_dates as $index => $usage_date) {
         $usage_start_time = $usage_start_times[$index];
         $usage_end_time = $usage_end_times[$index];
-        $stmt->bind_param('sissss', $username, $facility_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
+        $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
         $stmt->execute();
     }
     
@@ -84,12 +84,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <h2 class="text-center">施設リクエストフォーム</h2>
         <form method="post" action="request_form.php">
             <div class="form-group">
-                <label for="facility_id">施設名</label>
-                <select class="form-control" name="facility_id" id="facility_id" required>
+                <label for="building_id">建物</label>
+                <select class="form-control" name="building_id" id="building_id" required>
                     <option value="">選択してください</option>
-                    <?php while ($row = $result->fetch_assoc()): ?>
+                    <?php while ($row = $buildings->fetch_assoc()): ?>
                         <option value="<?php echo htmlspecialchars($row['id']); ?>"><?php echo htmlspecialchars($row['name']); ?></option>
                     <?php endwhile; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="room_id">部屋</label>
+                <select class="form-control" name="room_id" id="room_id" required>
+                    <option value="">先に建物を選択してください</option>
                 </select>
             </div>
             <div id="usage-schedule">
@@ -117,11 +123,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         $(document).ready(function() {
+            $('#building_id').on('change', function() {
+                var building_id = $(this).val();
+                if (building_id) {
+                    $.ajax({
+                        type: 'POST',
+                        url: 'get_rooms.php',
+                        data: 'building_id=' + building_id,
+                        success: function(html) {
+                            $('#room_id').html(html);
+                        }
+                    });
+                } else {
+                    $('#room_id').html('<option value="">先に建物を選択してください</option>');
+                }
+            });
+
             $('#add-schedule').on('click', function() {
                 var scheduleTemplate = `
                     <div class="form-group">

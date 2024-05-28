@@ -11,13 +11,10 @@ $username = $_SESSION['username'];
 require_once 'config.php';
 $conn = get_db_connection();
 
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-$sql = "SELECT requests.id, facilities.name AS facility, requests.usage_dates, requests.usage_start_times, requests.usage_end_times, requests.reason, requests.status 
-        FROM requests 
-        JOIN facilities ON requests.facility_id = facilities.id 
+$sql = "SELECT requests.id, buildings.name AS building_name, rooms.name AS room_name, requests.usage_dates, requests.usage_start_times, requests.usage_end_times, requests.reason, requests.status
+        FROM requests
+        JOIN rooms ON requests.room_id = rooms.id
+        JOIN buildings ON rooms.building_id = buildings.id
         WHERE requests.username = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param('s', $username);
@@ -26,10 +23,8 @@ $result = $stmt->get_result();
 ?>
 
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Request Status</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -69,10 +64,11 @@ $result = $stmt->get_result();
             <thead>
                 <tr>
                     <th>ID</th>
-                    <th>施設名</th>
+                    <th>建物名</th>
+                    <th>部屋名</th>
                     <th>使用日</th>
-                    <th>使用開始時間</th>
-                    <th>使用終了時間</th>
+                    <th>開始時間</th>
+                    <th>終了時間</th>
                     <th>申請理由</th>
                     <th>ステータス</th>
                 </tr>
@@ -81,7 +77,8 @@ $result = $stmt->get_result();
                 <?php while($row = $result->fetch_assoc()): ?>
                 <tr>
                     <td><?php echo htmlspecialchars($row['id']); ?></td>
-                    <td><?php echo htmlspecialchars($row['facility']); ?></td>
+                    <td><?php echo htmlspecialchars($row['building_name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['room_name']); ?></td>
                     <td><?php echo htmlspecialchars($row['usage_dates']); ?></td>
                     <td><?php echo htmlspecialchars($row['usage_start_times']); ?></td>
                     <td><?php echo htmlspecialchars($row['usage_end_times']); ?></td>
@@ -103,7 +100,7 @@ $result = $stmt->get_result();
             <a href="dashboard.php" class="btn btn-secondary">Back to Dashboard</a>
         </div>
     </div>
-
+    
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
