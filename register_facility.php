@@ -81,6 +81,8 @@ $rooms = $conn->query($sql_rooms);
 <!DOCTYPE html>
 <html lang="ja">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>施設登録</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
@@ -114,6 +116,9 @@ $rooms = $conn->query($sql_rooms);
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="#">施設リクエストシステム</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
@@ -128,7 +133,7 @@ $rooms = $conn->query($sql_rooms);
 
     <div class="container">
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-md-6 mb-4">
                 <div class="card">
                     <div class="card-header">建物の登録</div>
                     <div class="card-body">
@@ -142,7 +147,7 @@ $rooms = $conn->query($sql_rooms);
                     </div>
                 </div>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-6 mb-4">
                 <div class="card">
                     <div class="card-header">部屋の登録</div>
                     <div class="card-body">
@@ -168,63 +173,67 @@ $rooms = $conn->query($sql_rooms);
         </div>
 
         <h3 class="text-center section-title">登録済みの建物</h3>
-        <table class="table table-bordered mt-3">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>建物名</th>
-                    <th>アクション</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php
-                $buildings->data_seek(0); // 再度ループするためにポインタをリセット
-                while ($row = $buildings->fetch_assoc()): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($row['id']); ?></td>
-                    <td><?php echo htmlspecialchars($row['name']); ?></td>
-                    <td>
-                        <form method="post" action="register_facility.php" style="display:inline;">
-                            <input type="hidden" name="delete_building_id" value="<?php echo htmlspecialchars($row['id']); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm">削除</button>
-                        </form>
-                    </td>
-                </tr>
-                <?php endwhile; ?>
-            </tbody>
-        </table>
+        <div class="table-responsive">
+            <table class="table table-bordered mt-3">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>建物名</th>
+                        <th>アクション</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php
+                    $buildings->data_seek(0); // 再度ループするためにポインタをリセット
+                    while ($row = $buildings->fetch_assoc()): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['id']); ?></td>
+                        <td><?php echo htmlspecialchars($row['name']); ?></td>
+                        <td>
+                            <form method="post" action="register_facility.php" style="display:inline;">
+                                <input type="hidden" name="delete_building_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                                <button type="submit" class="btn btn-danger btn-sm">削除</button>
+                            </form>
+                        </td>
+                    </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
 
         <h3 class="text-center section-title">登録済みの部屋</h3>
-        <table class="table table-bordered mt-3">
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>建物名</th>
-                    <th>部屋名</th>
-                    <th>アクション</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $rooms->fetch_assoc()): ?>
-                <tr>
-                    <td><?php echo htmlspecialchars($row['id']); ?></td>
-                    <td><?php echo htmlspecialchars($row['building_name']); ?></td>
-                    <td><?php echo htmlspecialchars($row['room_name']); ?></td>
-                    <td>
-                        <form method="post" action="register_facility.php" style="display:inline;">
+        <div class="table-responsive">
+            <table class="table table-bordered mt-3">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>建物名</th>
+                        <th>部屋名</th>
+                        <th>アクション</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($row = $rooms->fetch_assoc()): ?>
+                    <tr>
+                        <td><?php echo htmlspecialchars($row['id']); ?></td>
+                        <td><?php echo htmlspecialchars($row['building_name']); ?></td>
+                        <td><?php echo htmlspecialchars($row['room_name']); ?></td>
+                        <td>
+                            <form method="post" action="register_facility.php" style="display:inline;">
                             <input type="hidden" name="delete_room_id" value="<?php echo htmlspecialchars($row['id']); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm">削除</button>
-                        </form>
-                    </td>
-                </tr>
+                            <button type="submit" class="btn btn-danger btn-sm">削除</button></form>
+                        </td>
+                    </tr>
                 <?php endwhile; ?>
             </tbody>
         </table>
     </div>
+</div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js”>
-    </body>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
 </html>
 <?php
 $conn->close();

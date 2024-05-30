@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $reason = $_POST['reason'];
 
     // リクエストごとにレコードを追加
-    $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, 'Pending')");
+    $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
     foreach ($usage_dates as $index => $usage_date) {
         $usage_start_time = $usage_start_times[$index];
         $usage_end_time = $usage_end_times[$index];
