@@ -14,24 +14,24 @@ if (!isset($_SESSION['username'])) {
 </head>
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <a class="navbar-brand" href="#">Facility Request System</a>
+        <a class="navbar-brand" href="#">施設予約システム</a>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
-                    <a class="nav-link" href="logout.php">Logout</a>
+                    <a class="nav-link" href="logout.php">ログアウト</a>
                 </li>
             </ul>
         </div>
     </nav>
 
     <div class="container mt-5">
-        <h1>Welcome, <?php echo $_SESSION['username']; ?>!</h1>
+        <h1>ようこそ <?php echo $_SESSION['username']; ?>さん</h1>
         <div class="mt-4">
             <?php if (isset($_SESSION['is_admin']) && $_SESSION['is_admin']): ?>
-                <a href="admin_dashboard.php" class="btn btn-primary">Go to Admin Dashboard</a>
+                <a href="admin_dashboard.php" class="btn btn-primary">管理画面へ</a>
             <?php else: ?>
-                <a href="request_form.php" class="btn btn-primary">Submit a Facility Request</a>
-                <a href="request_status.php" class="btn btn-info">View Your Requests</a>
+                <a href="request_form.php" class="btn btn-primary">施設予約</a>
+                <a href="request_status.php" class="btn btn-info">予約状況確認</a>
             <?php endif; ?>
         </div>
     </div>

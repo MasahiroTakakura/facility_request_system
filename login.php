@@ -47,20 +47,20 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="container mt-5">
         <div class="row justify-content-center">
             <div class="col-md-6">
-                <h2 class="text-center">Login</h2>
+                <h2 class="text-center">ログイン</h2>
                 <form method="post" action="login.php">
                     <div class="form-group">
-                        <label for="userid">User ID</label>
+                        <label for="userid">ID</label>
                         <input type="text" class="form-control" name="userid" required>
                     </div>
                     <div class="form-group">
                         <label for="password">Password</label>
                         <input type="password" class="form-control" name="password" required>
                     </div>
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    <button type="submit" class="btn btn-primary btn-block">ログイン</button>
                 </form>
                 <div class="text-center mt-3">
-                    <a href="register_user.php" class="btn btn-secondary btn-block">Register</a>
+                    <a href="register_user.php" class="btn btn-secondary btn-block">会員登録</a>
                 </div>
             </div>
         </div>

@@ -23,13 +23,15 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
 
         $stmt->close();
-    } elseif (isset($_POST['room_name']) && isset($_POST['building_id'])) {
+    } elseif (isset($_POST['room_name']) && isset($_POST['building_id']) && isset($_POST['available_start_time']) && isset($_POST['available_end_time'])) {
         // 部屋の登録
         $room_name = $_POST['room_name'];
         $building_id = $_POST['building_id'];
-        $sql = "INSERT INTO rooms (building_id, name) VALUES (?, ?)";
+        $available_start_time = $_POST['available_start_time'];
+        $available_end_time = $_POST['available_end_time'];
+        $sql = "INSERT INTO rooms (building_id, name, available_start_time, available_end_time) VALUES (?, ?, ?, ?)";
         $stmt = $conn->prepare($sql);
-        $stmt->bind_param('is', $building_id, $room_name);
+        $stmt->bind_param('isss', $building_id, $room_name, $available_start_time, $available_end_time);
 
         if ($stmt->execute()) {
             echo "<script>alert('部屋が正常に登録されました');</script>";
@@ -73,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $sql_buildings = "SELECT * FROM buildings";
 $buildings = $conn->query($sql_buildings);
 
-$sql_rooms = "SELECT rooms.id, rooms.name AS room_name, buildings.name AS building_name 
+$sql_rooms = "SELECT rooms.id, rooms.name AS room_name, buildings.name AS building_name, rooms.available_start_time, rooms.available_end_time 
               FROM rooms JOIN buildings ON rooms.building_id = buildings.id";
 $rooms = $conn->query($sql_rooms);
 ?>
@@ -165,6 +167,14 @@ $rooms = $conn->query($sql_rooms);
                                 <label for="room_name">部屋名</label>
                                 <input type="text" class="form-control" name="room_name" id="room_name" required>
                             </div>
+                            <div class="form-group">
+                                <label for="available_start_time">利用開始時間</label>
+                                <input type="time" class="form-control" name="available_start_time" id="available_start_time" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="available_end_time">利用終了時間</label>
+                                <input type="time" class="form-control" name="available_end_time" id="available_end_time" required>
+                            </div>
                             <button type="submit" class="btn btn-primary btn-block">部屋を登録</button>
                         </form>
                     </div>
@@ -203,37 +213,40 @@ $rooms = $conn->query($sql_rooms);
 
         <h3 class="text-center section-title">登録済みの部屋</h3>
         <div class="table-responsive">
-            <table class="table table-bordered mt-3">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>建物名</th>
-                        <th>部屋名</th>
-                        <th>アクション</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while ($row = $rooms->fetch_assoc()): ?>
-                    <tr>
-                        <td><?php echo htmlspecialchars($row['id']); ?></td>
-                        <td><?php echo htmlspecialchars($row['building_name']); ?></td>
-                        <td><?php echo htmlspecialchars($row['room_name']); ?></td>
-                        <td>
-                            <form method="post" action="register_facility.php" style="display:inline;">
-                            <input type="hidden" name="delete_room_id" value="<?php echo htmlspecialchars($row['id']); ?>">
-                            <button type="submit" class="btn btn-danger btn-sm">削除</button></form>
-                        </td>
-                    </tr>
-                <?php endwhile; ?>
-            </tbody>
-        </table>
-    </div>
+        <table class="table table-bordered mt-3">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>建物名</th>
+                    <th>部屋名</th>
+                    <th>利用開始時間</th>
+                    <th>利用終了時間</th>
+                    <th>アクション</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($row = $rooms->fetch_assoc()): ?>
+                <tr>
+                    <td><?php echo htmlspecialchars($row['id']); ?></td>
+                    <td><?php echo htmlspecialchars($row['building_name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['room_name']); ?></td>
+                    <td><?php echo htmlspecialchars($row['available_start_time']); ?></td>
+                    <td><?php echo htmlspecialchars($row['available_end_time']); ?></td>
+                    <td>
+                        <form method="post" action="register_facility.php" style="display:inline;">
+                        <input type="hidden" name="delete_room_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                        <button type="submit" class="btn btn-danger btn-sm">削除</button></form>
+                    </td>
+                </tr>
+            <?php endwhile; ?>
+        </tbody>
+    </table>
 </div>
-
-<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
-</body>
+                </div>
+                <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+                <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+                <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+                </body>
 </html>
 <?php
 $conn->close();

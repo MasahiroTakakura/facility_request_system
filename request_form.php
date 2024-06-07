@@ -22,6 +22,28 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $usage_end_times = $_POST['usage_end_times'];
     $reason = $_POST['reason'];
 
+    // 部屋の利用可能時間を取得
+    $room_query = "SELECT available_start_time, available_end_time FROM rooms WHERE id = ?";
+    $stmt = $conn->prepare($room_query);
+    $stmt->bind_param('i', $room_id);
+    $stmt->execute();
+    $stmt->bind_result($available_start_time, $available_end_time);
+    $stmt->fetch();
+    $stmt->close();
+
+    $is_valid = true;
+    foreach ($usage_start_times as $index => $start_time) {
+        $end_time = $usage_end_times[$index];
+        if ($start_time < $available_start_time || $end_time > $available_end_time || $start_time >= $end_time) {
+            $is_valid = false;
+            break;
+        }
+    }
+
+    if (!$is_valid) {
+        echo "<script>alert('利用可能時間外の時間が選択されています。リクエストを送信しましたが、管理者に確認してください。');</script>";
+    }
+
     // リクエストごとにレコードを追加
     $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
     foreach ($usage_dates as $index => $usage_date) {
@@ -30,7 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
         $stmt->execute();
     }
-    
     echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
 
     $stmt->close();
@@ -122,7 +143,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <a href="dashboard.php" class="btn btn-secondary">ダッシュボードに戻る</a>
         </div>
     </div>
-
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
@@ -166,3 +186,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </script>
 </body>
 </html>
+<?php
+// エラーが発生していたのは二重に閉じていたため、ここでは一度だけ閉じるように修正しました。
+$conn->close();
+?>
