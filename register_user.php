@@ -52,13 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <a class="navbar-brand" href="#">施設リクエストシステム</a>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <ul class="navbar-nav ml-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="login.php">ログイン</a>
-                </li>
-            </ul>
-        </div>
     </nav>
 
     <div class="container">
@@ -81,7 +74,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     <button type="submit" class="btn btn-primary btn-block">新規登録</button>
                 </form>
                 <div class="text-center mt-3">
-                    <a href="login.php" class="btn btn-secondary">ログイン</a>
+                    <a href="login.php" class="btn btn-secondary btn-block">ログイン</a>
                 </div>
             </div>
         </div>
