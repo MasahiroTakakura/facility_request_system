@@ -8,8 +8,15 @@ if (!isset($_SESSION['username'])) {
 require_once 'config.php';
 $conn = get_db_connection();
 
-$sql = "SELECT * FROM buildings";
-$buildings = $conn->query($sql);
+$building_id = isset($_GET['building_id']) ? $_GET['building_id'] : '';
+$room_id = isset($_GET['room_id']) ? $_GET['room_id'] : '';
+$date = isset($_GET['date']) ? $_GET['date'] : '';
+
+$sql_buildings = "SELECT * FROM buildings";
+$buildings = $conn->query($sql_buildings);
+
+$sql_rooms = $building_id ? "SELECT * FROM rooms WHERE building_id = $building_id" : "SELECT * FROM rooms";
+$rooms = $conn->query($sql_rooms);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = $_SESSION['username'];
@@ -20,11 +27,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $reason = $_POST['reason'];
 
     $is_valid = true;
+    $errors = [];
     foreach ($usage_dates as $index => $usage_date) {
         $start_time = $usage_start_times[$index];
         $end_time = $usage_end_times[$index];
 
-        // 日付ごとの利用可能時間を取得
         $availability_query = "SELECT available_start_time, available_end_time FROM room_availability WHERE room_id = ? AND date = ?";
         $stmt = $conn->prepare($availability_query);
         $stmt->bind_param('is', $room_id, $usage_date);
@@ -33,17 +40,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $stmt->fetch();
         $stmt->close();
 
-        // 利用可能時間の設定がある場合のみチェック
         if ($available_start_time && $available_end_time) {
             if ($start_time < $available_start_time || $end_time > $available_end_time || $start_time >= $end_time) {
                 $is_valid = false;
-                break;
+                $errors[] = "$usage_date の利用可能時間は $available_start_time から $available_end_time までです。管理者に問い合わせてください。";
             }
+        } else {
+            $is_valid = false;
+            $errors[] = "$usage_date は利用できません。管理者に問い合わせてください。";
         }
     }
 
     if (!$is_valid) {
-        echo "<script>alert('利用可能時間外の時間が選択されています。リクエストを送信しましたが、管理者に確認してください。');</script>";
+        foreach ($errors as $error) {
+            echo "<script>alert('$error');</script>";
+        }
     }
 
     // リクエストごとにレコードを追加
@@ -74,12 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         }
         .container {
             max-width: 800px;
+            margin-top: 50px;
         }
         .form-control, .btn {
             margin-bottom: 15px;
-        }
-        .back-button {
-            margin-top: 20px;
         }
         .input-group-append .btn {
             border-top-left-radius: 0;
@@ -111,7 +120,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <select class="form-control" name="building_id" id="building_id" required>
                     <option value="">選択してください</option>
                     <?php while ($row = $buildings->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($row['id']); ?>"><?php echo htmlspecialchars($row['name']); ?></option>
+                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($building_id == $row['id']) echo 'selected'; ?>>
+                            <?php echo htmlspecialchars($row['name']); ?>
+                        </option>
                     <?php endwhile; ?>
                 </select>
             </div>
@@ -119,13 +130,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <label for="room_id">部屋</label>
                 <select class="form-control" name="room_id" id="room_id" required>
                     <option value="">先に建物を選択してください</option>
+                    <?php while ($row = $rooms->fetch_assoc()): ?>
+                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($room_id == $row['id']) echo 'selected'; ?>>
+                            <?php echo htmlspecialchars($row['name']); ?>
+                        </option>
+                    <?php endwhile; ?>
                 </select>
             </div>
             <div id="usage-schedule">
                 <div class="form-group">
                     <label>使用スケジュール</label>
                     <div class="input-group mb-3">
-                        <input type="date" class="form-control" name="usage_dates[]" required>
+                        <input type="date" class="form-control" name="usage_dates[]" value="<?php echo htmlspecialchars($date); ?>" required>
                         <input type="time" class="form-control" name="usage_start_times[]" required>
                         <input type="time" class="form-control" name="usage_end_times[]" required>
                         <div class="input-group-append">
@@ -140,10 +156,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <textarea class="form-control" name="reason" id="reason" rows="3" placeholder="理由を入力してください" required></textarea>
             </div>
             <button type="submit" class="btn btn-primary btn-block">送信</button>
+            <a href="availability.php" class="btn btn-secondary btn-block">空き状況確認に戻る</a>
+            <a href="dashboard.php" class="btn btn-info btn-block">ダッシュボードに戻る</a>
         </form>
-        <div class="text-center back-button">
-            <a href="dashboard.php" class="btn btn-secondary">ダッシュボードに戻る</a>
-        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
@@ -151,6 +166,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         $(document).ready(function() {
+            var initialBuildingId = '<?php echo $building_id; ?>';
+            if (initialBuildingId) {
+                $.ajax({
+                    type: 'POST',
+                    url: 'get_rooms.php',
+                    data: { building_id: initialBuildingId },
+                    success: function(html) {
+                        $('#room_id').html(html);
+                        $('#room_id').val('<?php echo $room_id; ?>');
+                    }
+                });
+            }
+
             $('#building_id').on('change', function() {
                 var building_id = $(this).val();
                 if (building_id) {
