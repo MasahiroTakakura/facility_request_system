@@ -1,9 +1,9 @@
 <?php
-// session_start();
-// if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
-//     header("Location: login.php");
-//     exit();
-// }
+session_start();
+if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
+    header("Location: login.php");
+    exit();
+}
 
 require_once 'config.php';
 
@@ -50,6 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .form-control, .btn {
             margin-bottom: 15px;
         }
+        .back-button {
+            margin-top: 20px;
+        }
     </style>
 </head>
 <body>
@@ -74,6 +77,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             <button type="submit" class="btn btn-primary btn-block">登録</button>
         </form>
+        <div class="text-center back-button">
+            <a href="admin_dashboard.php" class="btn btn-secondary btn-block">ダッシュボードに戻る</a>
+        </div>
     </div>
 </body>
 </html>

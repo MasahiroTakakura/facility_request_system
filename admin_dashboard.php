@@ -63,17 +63,20 @@ $result = $conn->query($sql);
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
+            <li class="nav-item">
+                    <a class="nav-link" href="register_admin.php">管理者追加</a> <!-- 追加されたボタン -->
+                </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="logout.php">ログアウト</a>
+                    <a class="nav-link" href="logout.php">ログアウト</a> <!-- ログアウトボタン -->
                 </li>
             </ul>
         </div>
     </nav>
-
-    <div class="container mt-5">
-        <h2 class="text-center">管理者ダッシュボード</h2>
+    
+    <div class="container">
+        <h2 class="text-center">リクエスト一覧</h2>
         <div class="table-responsive">
-            <table class="table table-bordered mt-4">
+            <table class="table">
                 <thead>
                     <tr>
                         <th>ID</th>

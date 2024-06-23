@@ -32,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $start_time = $usage_start_times[$index];
         $end_time = $usage_end_times[$index];
 
+        // 使用可能時間をチェック
         $availability_query = "SELECT available_start_time, available_end_time FROM room_availability WHERE room_id = ? AND date = ?";
         $stmt = $conn->prepare($availability_query);
         $stmt->bind_param('is', $room_id, $usage_date);
@@ -47,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } else {
             $is_valid = false;
-            $errors[] = "$usage_date は利用できません。管理者に問い合わせてください。";
+            $errors[] = "$usage_date は利用できません。";
         }
     }
 
@@ -55,20 +56,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         foreach ($errors as $error) {
             echo "<script>alert('$error');</script>";
         }
+    } else {
+        $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
+        foreach ($usage_dates as $index => $usage_date) {
+            $usage_start_time = $usage_start_times[$index];
+            $usage_end_time = $usage_end_times[$index];
+            $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
+            $stmt->execute();
+        }
+        echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
+        $stmt->close();
     }
-
-    // リクエストごとにレコードを追加
-    $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
-    foreach ($usage_dates as $index => $usage_date) {
-        $usage_start_time = $usage_start_times[$index];
-        $usage_end_time = $usage_end_times[$index];
-        $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
-        $stmt->execute();
-    }
-    echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
-
-    $stmt->close();
-    $conn->close();
 }
 ?>
 
@@ -203,7 +201,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <input type="time" class="form-control" name="usage_start_times[]" required>
                             <input type="time" class="form-control" name="usage_end_times[]" required>
                             <div class="input-group-append">
-                                <button type="button" class="btn btn-danger remove-schedule">削除</button>
+                            <button type="button" class="btn btn-danger remove-schedule">削除</button>
                             </div>
                         </div>
                     </div>`;
@@ -218,5 +216,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </body>
 </html>
 <?php
-$conn->close();
+// Close the MySQL connection
+if ($conn->ping()) {
+    $conn->close();
+}
 ?>
