@@ -12,9 +12,29 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 $conn = get_db_connection();
 $inserted_rows = [];
+$error_message = '';
 
 function register_facility($building_name, $room_name, $date, $available_start_time, $available_end_time) {
-    global $conn, $inserted_rows;
+    global $conn, $inserted_rows, $error_message;
+
+    // Input validation
+    if (empty($building_name) || empty($room_name) || empty($date) || empty($available_start_time) || empty($available_end_time)) {
+        $error_message = "全てのフィールドを入力してください。";
+        return false;
+    }
+
+    // Validate date format
+    if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $date)) {
+        $error_message = "無効な日付形式です。YYYY-MM-DD形式で入力してください。";
+        return false;
+    }
+
+    // Validate time format
+    if (!preg_match("/^(?:2[0-3]|[01][0-9]):[0-5][0-9]$/", $available_start_time) || 
+        !preg_match("/^(?:2[0-3]|[01][0-9]):[0-5][0-9]$/", $available_end_time)) {
+        $error_message = "無効な時間形式です。HH:MM形式で入力してください。";
+        return false;
+    }
 
     // 建物を登録または取得
     $sql = "SELECT id FROM buildings WHERE name = ?";
@@ -61,6 +81,8 @@ function register_facility($building_name, $room_name, $date, $available_start_t
         'available_start_time' => $available_start_time,
         'available_end_time' => $available_end_time
     ];
+
+    return true;
 }
 
 function delete_facility($building_name, $room_name, $date) {
@@ -85,20 +107,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         foreach ($rows as $index => $row) {
             if ($index == 0) continue; // ヘッダー行をスキップ
-            register_facility($row[0], $row[1], $row[2], $row[3], $row[4]);
+            if (register_facility($row[0], $row[1], $row[2], $row[3], $row[4])) {
+                $inserted_rows[] = $row;
+            }
         }
 
-        echo "<script>alert('施設が正常に登録されました');</script>";
+        if (!empty($inserted_rows)) {
+            echo "<script>alert('施設が正常に登録されました');</script>";
+        } else {
+            echo "<script>alert('施設の登録に失敗しました: {$error_message}');</script>";
+        }
     } elseif (isset($_POST['building_name'], $_POST['room_name'], $_POST['date'], $_POST['available_start_time'], $_POST['available_end_time'])) {
-        register_facility($_POST['building_name'], $_POST['room_name'], $_POST['date'], $_POST['available_start_time'], $_POST['available_end_time']);
-        echo "<script>alert('施設が正常に登録されました');</script>";
+        if (register_facility($_POST['building_name'], $_POST['room_name'], $_POST['date'], $_POST['available_start_time'], $_POST['available_end_time'])) {
+            echo "<script>alert('施設が正常に登録されました');</script>";
+        } else {
+            echo "<script>alert('施設の登録に失敗しました: {$error_message}');</script>";
+        }
     }
 }
 
 // 施設一覧を取得
 $sql = "SELECT buildings.name as building_name, rooms.name as room_name, room_availability.date, room_availability.available_start_time, room_availability.available_end_time FROM buildings JOIN rooms ON buildings.id = rooms.building_id JOIN room_availability ON rooms.id = room_availability.room_id ORDER BY buildings.name, rooms.name, room_availability.date";
 $facilities = $conn->query($sql);
-?><!DOCTYPE html>
+?>
+<!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
@@ -201,12 +233,14 @@ $facilities = $conn->query($sql);
                             </td>
                         </tr>
                     <?php endwhile; ?>
-                </tbody>
-            </table>
-        </div>
-    <?php endif; ?>
-</div>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
 
-<script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>
