@@ -1,10 +1,17 @@
 <?php
 session_start();
 require_once 'config.php';
+require_once 'functions.php';
+generate_csrf_token();
 
 $conn = get_db_connection();
 
+$error_message = '';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
     $userid = $_POST['userid'];
     $password = $_POST['password'];
 
@@ -52,15 +59,16 @@ $conn->close();
 <body>
     <div class="container">
         <h2 class="text-center">ログイン</h2>
-        <?php if (isset($error_message)): ?>
+        <?php if ($error_message): ?>
             <div class="alert alert-danger" role="alert">
-                <?php echo htmlspecialchars($error_message); ?>
+                <?php echo h($error_message); ?>
             </div>
         <?php endif; ?>
         <form method="post" action="login.php">
+            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
             <div class="form-group">
                 <label for="userid">ユーザーID</label>
-                <input type="text" class="form-control" id="userid" name="userid" required>
+                <input type="text" class="form-control" id="userid" name="userid" required value="<?php echo isset($_POST['userid']) ? h($_POST['userid']) : ''; ?>">
             </div>
             <div class="form-group">
                 <label for="password">パスワード</label>
@@ -71,7 +79,7 @@ $conn->close();
         </form>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>

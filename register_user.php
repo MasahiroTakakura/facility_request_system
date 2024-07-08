@@ -1,11 +1,17 @@
 <?php
+session_start();
+require_once 'config.php';
+require_once 'functions.php';
+generate_csrf_token();
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
     $userid = $_POST['userid'];
     $username = $_POST['username'];
     $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
 
-    // データベース接続
-    require_once 'config.php';
     $conn = get_db_connection();
 
     $sql = "INSERT INTO users (userid, username, password, is_admin) VALUES (?, ?, ?, 0)";
@@ -15,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($stmt->execute()) {
         echo "<script>alert('登録が完了しました'); window.location.href='login.php';</script>";
     } else {
-        echo "<div class='alert alert-danger' role='alert'>Error: " . $stmt->error . "</div>";
+        $error_message = "Error: " . $stmt->error;
     }
 
     $stmt->close();
@@ -58,7 +64,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <h2 class="text-center">ユーザー登録</h2>
+                <?php if (isset($error_message)): ?>
+                    <div class="alert alert-danger" role="alert">
+                        <?php echo htmlspecialchars($error_message); ?>
+                    </div>
+                <?php endif; ?>
                 <form method="post" action="register_user.php">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                     <div class="form-group">
                         <label for="userid">ユーザーID</label>
                         <input type="text" class="form-control" name="userid" id="userid" required>

@@ -1,26 +1,40 @@
 <?php
 session_start();
+require_once 'config.php';
+require_once 'functions.php';
+generate_csrf_token();
+
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
 }
 
-require_once 'config.php';
 $conn = get_db_connection();
 
-$building_id = isset($_GET['building_id']) ? $_GET['building_id'] : '';
-$room_id = isset($_GET['room_id']) ? $_GET['room_id'] : '';
+$building_id = isset($_GET['building_id']) ? intval($_GET['building_id']) : '';
+$room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : '';
 $date = isset($_GET['date']) ? $_GET['date'] : '';
 
 $sql_buildings = "SELECT * FROM buildings";
 $buildings = $conn->query($sql_buildings);
 
-$sql_rooms = $building_id ? "SELECT * FROM rooms WHERE building_id = $building_id" : "SELECT * FROM rooms";
-$rooms = $conn->query($sql_rooms);
+$rooms = array();
+
+if ($building_id) {
+    $sql_rooms = "SELECT * FROM rooms WHERE building_id = ?";
+    $stmt = $conn->prepare($sql_rooms);
+    $stmt->bind_param('i', $building_id);
+    $stmt->execute();
+    $rooms = $stmt->get_result();
+    $stmt->close();
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
     $username = $_SESSION['username'];
-    $room_id = $_POST['room_id'];
+    $room_id = intval($_POST['room_id']);
     $usage_dates = $_POST['usage_dates'];
     $usage_start_times = $_POST['usage_start_times'];
     $usage_end_times = $_POST['usage_end_times'];
@@ -32,7 +46,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $start_time = $usage_start_times[$index];
         $end_time = $usage_end_times[$index];
 
-        // 使用可能時間をチェック
         $availability_query = "SELECT available_start_time, available_end_time FROM room_availability WHERE room_id = ? AND date = ?";
         $stmt = $conn->prepare($availability_query);
         $stmt->bind_param('is', $room_id, $usage_date);
@@ -44,18 +57,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($available_start_time && $available_end_time) {
             if ($start_time < $available_start_time || $end_time > $available_end_time || $start_time >= $end_time) {
                 $is_valid = false;
-                $errors[] = "$usage_date の利用可能時間は $available_start_time から $available_end_time までです。管理者に問い合わせてください。";
+                $errors[] = h($usage_date) . " の利用可能時間は " . h($available_start_time) . " から " . h($available_end_time) . " までです。";
             }
         } else {
             $is_valid = false;
-            $errors[] = "$usage_date は利用できません。";
+            $errors[] = h($usage_date) . " は利用できません。";
         }
     }
 
     if (!$is_valid) {
-        foreach ($errors as $error) {
-            echo "<script>alert('$error');</script>";
-        }
+        $error_message = implode("<br>", $errors);
     } else {
         $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
         foreach ($usage_dates as $index => $usage_date) {
@@ -64,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
             $stmt->execute();
         }
-        echo "<script>alert('リクエストは正常に送信されました'); window.location.href='dashboard.php';</script>";
+        $success_message = "リクエストは正常に送信されました";
         $stmt->close();
     }
 }
@@ -112,34 +123,47 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <div class="container mt-5">
         <h2 class="text-center">施設リクエストフォーム</h2>
+        <?php if (isset($error_message)): ?>
+            <div class="alert alert-danger" role="alert">
+                <?php echo $error_message; ?>
+            </div>
+        <?php endif; ?>
+        <?php if (isset($success_message)): ?>
+            <div class="alert alert-success" role="alert">
+                <?php echo h($success_message); ?>
+            </div>
+        <?php endif; ?>
         <form method="post" action="request_form.php">
+            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
             <div class="form-group">
                 <label for="building_id">建物</label>
                 <select class="form-control" name="building_id" id="building_id" required>
                     <option value="">選択してください</option>
                     <?php while ($row = $buildings->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($building_id == $row['id']) echo 'selected'; ?>>
-                            <?php echo htmlspecialchars($row['name']); ?>
+                        <option value="<?php echo h($row['id']); ?>" <?php if ($building_id == $row['id']) echo 'selected'; ?>>
+                            <?php echo h($row['name']); ?>
                         </option>
                     <?php endwhile; ?>
                 </select>
             </div>
             <div class="form-group">
                 <label for="room_id">部屋</label>
-                <select class="form-control" name="room_id" id="room_id" required>
+                <select class="form-control" name="room_id" id="room_id" required <?php if (!$building_id) echo 'disabled'; ?>>
                     <option value="">先に建物を選択してください</option>
-                    <?php while ($row = $rooms->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($room_id == $row['id']) echo 'selected'; ?>>
-                            <?php echo htmlspecialchars($row['name']); ?>
-                        </option>
-                    <?php endwhile; ?>
+                    <?php if ($rooms): ?>
+                        <?php while ($row = $rooms->fetch_assoc()): ?>
+                            <option value="<?php echo h($row['id']); ?>" <?php if ($room_id == $row['id']) echo 'selected'; ?>>
+                                <?php echo h($row['name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    <?php endif; ?>
                 </select>
             </div>
             <div id="usage-schedule">
                 <div class="form-group">
                     <label>使用スケジュール</label>
                     <div class="input-group mb-3">
-                        <input type="date" class="form-control" name="usage_dates[]" value="<?php echo htmlspecialchars($date); ?>" required>
+                        <input type="date" class="form-control" name="usage_dates[]" value="<?php echo h($date); ?>" required>
                         <input type="time" class="form-control" name="usage_start_times[]" required>
                         <input type="time" class="form-control" name="usage_end_times[]" required>
                         <div class="input-group-append">
@@ -169,10 +193,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $.ajax({
                     type: 'POST',
                     url: 'get_rooms.php',
-                    data: { building_id: initialBuildingId },
+                    data: { 
+                        building_id: initialBuildingId,
+                        csrf_token: '<?php echo h($_SESSION['csrf_token']); ?>'
+                    },
                     success: function(html) {
                         $('#room_id').html(html);
                         $('#room_id').val('<?php echo $room_id; ?>');
+                        $('#room_id').prop('disabled', false);
                     }
                 });
             }
@@ -183,13 +211,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     $.ajax({
                         type: 'POST',
                         url: 'get_rooms.php',
-                        data: 'building_id=' + building_id,
+                        data: { 
+                            building_id: building_id,
+                            csrf_token: '<?php echo h($_SESSION['csrf_token']); ?>'
+                        },
                         success: function(html) {
                             $('#room_id').html(html);
+                            $('#room_id').prop('disabled', false);
                         }
                     });
                 } else {
                     $('#room_id').html('<option value="">先に建物を選択してください</option>');
+                    $('#room_id').prop('disabled', true);
                 }
             });
 
@@ -216,7 +249,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 </body>
 </html>
 <?php
-// Close the MySQL connection
 if ($conn->ping()) {
     $conn->close();
 }

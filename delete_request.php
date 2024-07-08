@@ -1,35 +1,59 @@
 <?php
 session_start();
+require_once 'config.php';
+require_once 'functions.php';
+
 if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header("Location: login.php");
     exit();
 }
 
-if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['request_id'])) {
-    $request_id = intval($_POST['request_id']);
+$conn = get_db_connection();
 
-    // Include the database configuration file
-    require_once 'config.php';
+$response = array('success' => false, 'message' => '');
 
-    // Get the database connection
-    $conn = get_db_connection();
-
-    // Prepare an SQL statement with placeholders
-    $sql = "DELETE FROM requests WHERE id = ?";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param("i", $request_id);
-
-    // Execute the statement
-    if ($stmt->execute()) {
-        // 成功した場合、管理者ダッシュボードにリダイレクト
-        header("Location: admin_dashboard.php");
-        exit();
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'])) {
+        $response['message'] = 'CSRF token validation failed';
     } else {
-        // 失敗した場合、エラーメッセージを表示
-        echo "Error deleting record: " . $stmt->error;
-    }
+        $request_id = intval($_POST['request_id']);
 
-    $stmt->close();
-    $conn->close();
+        // リクエストの詳細を取得
+        $sql = "SELECT status FROM requests WHERE id = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('i', $request_id);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        $request = $result->fetch_assoc();
+        $stmt->close();
+
+        if ($request) {
+            // リクエストを削除
+            $sql = "DELETE FROM requests WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param('i', $request_id);
+
+            if ($stmt->execute()) {
+                if ($stmt->affected_rows > 0) {
+                    $response['success'] = true;
+                    $response['message'] = 'リクエストが正常に削除されました。';
+                } else {
+                    $response['message'] = 'リクエストの削除に失敗しました。';
+                }
+            } else {
+                $response['message'] = 'エラー: ' . $stmt->error;
+            }
+
+            $stmt->close();
+        } else {
+            $response['message'] = 'リクエストが見つかりません。';
+        }
+    }
 }
+
+// JSONレスポンスを返す
+header('Content-Type: application/json');
+echo json_encode($response);
+
+$conn->close();
 ?>

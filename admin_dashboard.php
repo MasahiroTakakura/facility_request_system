@@ -1,14 +1,14 @@
 <?php
 session_start();
+require_once 'config.php';
+require_once 'functions.php';
+generate_csrf_token();
+
 if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header("Location: login.php");
     exit();
 }
 
-// データベース設定ファイルを読み込む
-require_once 'config.php';
-
-// データベース接続を取得
 $conn = get_db_connection();
 
 // リクエストの一覧を取得
@@ -63,11 +63,11 @@ $result = $conn->query($sql);
         </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
-            <li class="nav-item">
-                    <a class="nav-link" href="register_admin.php">管理者追加</a> <!-- 追加されたボタン -->
+                <li class="nav-item">
+                    <a class="nav-link" href="register_admin.php">管理者追加</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="logout.php">ログアウト</a> <!-- ログアウトボタン -->
+                    <a class="nav-link" href="logout.php">ログアウト</a>
                 </li>
             </ul>
         </div>
@@ -94,34 +94,37 @@ $result = $conn->query($sql);
                 <tbody>
                     <?php while ($row = $result->fetch_assoc()): ?>
                     <tr>
-                        <td><?php echo htmlspecialchars($row['id']); ?></td>
-                        <td><?php echo htmlspecialchars($row['username']); ?></td>
-                        <td><?php echo htmlspecialchars($row['building_name']); ?></td>
-                        <td><?php echo htmlspecialchars($row['room_name']); ?></td>
-                        <td><?php echo htmlspecialchars($row['usage_dates']); ?></td>
-                        <td><?php echo htmlspecialchars($row['usage_start_times']); ?></td>
-                        <td><?php echo htmlspecialchars($row['usage_end_times']); ?></td>
-                        <td><?php echo htmlspecialchars($row['reason']); ?></td>
+                        <td><?php echo h($row['id']); ?></td>
+                        <td><?php echo h($row['username']); ?></td>
+                        <td><?php echo h($row['building_name']); ?></td>
+                        <td><?php echo h($row['room_name']); ?></td>
+                        <td><?php echo h($row['usage_dates']); ?></td>
+                        <td><?php echo h($row['usage_start_times']); ?></td>
+                        <td><?php echo h($row['usage_end_times']); ?></td>
+                        <td><?php echo h($row['reason']); ?></td>
                         <td>
                             <?php if ($row['status'] == '承認済み'): ?>
-                                <span class="badge badge-success"><?php echo htmlspecialchars($row['status']); ?></span>
+                                <span class="badge badge-success"><?php echo h($row['status']); ?></span>
                             <?php elseif ($row['status'] == '却下'): ?>
-                                <span class="badge badge-danger"><?php echo htmlspecialchars($row['status']); ?></span>
+                                <span class="badge badge-danger"><?php echo h($row['status']); ?></span>
                             <?php else: ?>
-                                <span class="badge badge-warning"><?php echo htmlspecialchars($row['status']); ?></span>
+                                <span class="badge badge-warning"><?php echo h($row['status']); ?></span>
                             <?php endif; ?>
                         </td>
                         <td>
                             <form method="post" action="approve_request.php" class="d-inline">
-                                <input type="hidden" name="request_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                                <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                                <input type="hidden" name="request_id" value="<?php echo h($row['id']); ?>">
                                 <button type="submit" name="action" value="Approve" class="btn btn-success btn-sm">承認</button>
                             </form>
                             <form method="post" action="approve_request.php" class="d-inline">
-                                <input type="hidden" name="request_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                                <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                                <input type="hidden" name="request_id" value="<?php echo h($row['id']); ?>">
                                 <button type="submit" name="action" value="Reject" class="btn btn-danger btn-sm">却下</button>
                             </form>
                             <form method="post" action="delete_request.php" class="d-inline">
-                                <input type="hidden" name="request_id" value="<?php echo htmlspecialchars($row['id']); ?>">
+                                <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                                <input type="hidden" name="request_id" value="<?php echo h($row['id']); ?>">
                                 <button type="submit" name="action" value="Delete" class="btn btn-danger btn-sm">削除</button>
                             </form>
                         </td>
