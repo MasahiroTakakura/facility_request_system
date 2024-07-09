@@ -1,30 +1,29 @@
 <?php
 session_start();
 require_once 'config.php';
+require_once 'functions.php';
+generate_csrf_token();
+
+if (!isset($_SESSION['username'])) {
+    header("Location: login.php");
+    exit();
+}
 
 $conn = get_db_connection();
 
-$building_id = isset($_GET['building_id']) ? $_GET['building_id'] : '';
-$room_id = isset($_GET['room_id']) ? $_GET['room_id'] : '';
+$building_id = isset($_POST['building_id']) ? intval($_POST['building_id']) : '';
+$room_id = isset($_POST['room_id']) ? intval($_POST['room_id']) : '';
 
 $sql_buildings = "SELECT * FROM buildings";
 $buildings = $conn->query($sql_buildings);
 
-$sql_rooms = $building_id ? "SELECT * FROM rooms WHERE building_id = $building_id" : "SELECT * FROM rooms";
-$rooms = $conn->query($sql_rooms);
-
-$room_availability = [];
-
-if ($room_id) {
-    // 使用可能時間を取得
-    $sql_room_availability = "SELECT * FROM room_availability WHERE room_id = ?";
-    $stmt = $conn->prepare($sql_room_availability);
-    $stmt->bind_param('i', $room_id);
+$rooms = array();
+if ($building_id) {
+    $sql_rooms = "SELECT * FROM rooms WHERE building_id = ?";
+    $stmt = $conn->prepare($sql_rooms);
+    $stmt->bind_param('i', $building_id);
     $stmt->execute();
-    $result = $stmt->get_result();
-    while ($row = $result->fetch_assoc()) {
-        $room_availability[] = $row;
-    }
+    $rooms = $stmt->get_result();
     $stmt->close();
 }
 
@@ -55,7 +54,7 @@ $conn->close();
         }
         #toast-container > .toast-info {
             background-color: #007bff;
-            opacity: 1; /* 透けないように設定 */
+            opacity: 1;
         }
     </style>
 </head>
@@ -73,25 +72,26 @@ $conn->close();
 
     <div class="container">
         <h2 class="text-center">空き状況確認</h2>
-        <form method="get" action="availability.php">
+        <form id="availability-form">
+            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
             <div class="form-group">
                 <label for="building_id">建物</label>
-                <select class="form-control" name="building_id" id="building_id" onchange="this.form.submit()">
+                <select class="form-control" name="building_id" id="building_id">
                     <option value="">選択してください</option>
                     <?php while ($row = $buildings->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($building_id == $row['id']) echo 'selected'; ?>>
-                            <?php echo htmlspecialchars($row['name']); ?>
+                        <option value="<?php echo h($row['id']); ?>" <?php if ($building_id == $row['id']) echo 'selected'; ?>>
+                            <?php echo h($row['name']); ?>
                         </option>
                     <?php endwhile; ?>
                 </select>
             </div>
             <div class="form-group">
                 <label for="room_id">部屋</label>
-                <select class="form-control" name="room_id" id="room_id" onchange="this.form.submit()">
+                <select class="form-control" name="room_id" id="room_id">
                     <option value="">選択してください</option>
-                    <?php while ($row = $rooms->fetch_assoc()): ?>
-                        <option value="<?php echo htmlspecialchars($row['id']); ?>" <?php if ($room_id == $row['id']) echo 'selected'; ?>>
-                            <?php echo htmlspecialchars($row['name']); ?>
+                    <?php while ($rooms && $row = $rooms->fetch_assoc()): ?>
+                        <option value="<?php echo h($row['id']); ?>" <?php if ($room_id == $row['id']) echo 'selected'; ?>>
+                            <?php echo h($row['name']); ?>
                         </option>
                     <?php endwhile; ?>
                 </select>
@@ -109,19 +109,13 @@ $conn->close();
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.1/main.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
     <script>
+        let calendar;
+
         document.addEventListener('DOMContentLoaded', function() {
             var calendarEl = document.getElementById('calendar');
-            var calendar = new FullCalendar.Calendar(calendarEl, {
+            calendar = new FullCalendar.Calendar(calendarEl, {
                 initialView: 'dayGridMonth',
-                events: [
-                    <?php foreach ($room_availability as $availability): ?>
-                    {
-                        title: '利用可能: <?php echo $availability['available_start_time']; ?> - <?php echo $availability['available_end_time']; ?>',
-                        start: '<?php echo $availability['date']; ?>',
-                        url: 'request_form.php?room_id=<?php echo $room_id; ?>&date=<?php echo $availability['date']; ?>&building_id=<?php echo $building_id; ?>'
-                    },
-                    <?php endforeach; ?>
-                ],
+                events: [],
                 eventColor: '#378006',
                 eventMouseEnter: function(info) {
                     toastr.options = {
@@ -148,6 +142,50 @@ $conn->close();
                 }
             });
             calendar.render();
+        });
+
+        $('#building_id').change(function() {
+            var building_id = $(this).val();
+            if (building_id) {
+                $.ajax({
+                    url: 'get_rooms.php',
+                    type: 'POST',
+                    data: {
+                        building_id: building_id,
+                        csrf_token: $('input[name="csrf_token"]').val()
+                    },
+                    success: function(response) {
+                        $('#room_id').html(response);
+                        calendar.removeAllEvents();
+                    }
+                });
+            } else {
+                $('#room_id').html('<option value="">選択してください</option>');
+                calendar.removeAllEvents();
+            }
+        });
+
+        $('#room_id').change(function() {
+            var room_id = $(this).val();
+            var building_id = $('#building_id').val();
+            if (room_id) {
+                $.ajax({
+                    url: 'get_availability.php',
+                    type: 'POST',
+                    data: {
+                        room_id: room_id,
+                        building_id: building_id,
+                        csrf_token: $('input[name="csrf_token"]').val()
+                    },
+                    dataType: 'json',
+                    success: function(response) {
+                        calendar.removeAllEvents();
+                        calendar.addEventSource(response);
+                    }
+                });
+            } else {
+                calendar.removeAllEvents();
+            }
         });
     </script>
 </body>

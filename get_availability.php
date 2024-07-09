@@ -1,15 +1,22 @@
 <?php
+session_start();
 require_once 'config.php';
+require_once 'functions.php';
+
+if (!isset($_SESSION['username']) || !verify_csrf_token($_POST['csrf_token'])) {
+    header('HTTP/1.1 403 Forbidden');
+    exit('アクセスが拒否されました。');
+}
 
 $conn = get_db_connection();
 
 // 検索条件の取得
-$building_name = isset($_GET['building_name']) ? $_GET['building_name'] : '';
-$room_name = isset($_GET['room_name']) ? $_GET['room_name'] : '';
-$date = isset($_GET['date']) ? $_GET['date'] : '';
+$building_id = isset($_POST['building_id']) ? intval($_POST['building_id']) : '';
+$room_id = isset($_POST['room_id']) ? intval($_POST['room_id']) : '';
+$date = isset($_POST['date']) ? $_POST['date'] : '';
 
 // クエリのベース
-$sql = "SELECT buildings.name AS building_name, rooms.name AS room_name, room_availability.date, room_availability.available_start_time, room_availability.available_end_time
+$sql = "SELECT buildings.id AS building_id, buildings.name AS building_name, rooms.id AS room_id, rooms.name AS room_name, room_availability.date, room_availability.available_start_time, room_availability.available_end_time
         FROM buildings
         JOIN rooms ON buildings.id = rooms.building_id
         JOIN room_availability ON rooms.id = room_availability.room_id
@@ -20,16 +27,16 @@ $params = [];
 $types = '';
 
 // 条件に応じてクエリに追加
-if ($building_name) {
-    $sql .= " AND buildings.name LIKE ?";
-    $params[] = '%' . $building_name . '%';
-    $types .= 's';
+if ($building_id) {
+    $sql .= " AND buildings.id = ?";
+    $params[] = $building_id;
+    $types .= 'i';
 }
 
-if ($room_name) {
-    $sql .= " AND rooms.name LIKE ?";
-    $params[] = '%' . $room_name . '%';
-    $types .= 's';
+if ($room_id) {
+    $sql .= " AND rooms.id = ?";
+    $params[] = $room_id;
+    $types .= 'i';
 }
 
 if ($date) {
@@ -49,7 +56,11 @@ $result = $stmt->get_result();
 
 $availability = [];
 while ($row = $result->fetch_assoc()) {
-    $availability[] = $row;
+    $availability[] = [
+        'title' => '利用可能: ' . h($row['available_start_time']) . ' - ' . h($row['available_end_time']),
+        'start' => h($row['date']),
+        'url' => 'request_form.php?room_id=' . h($row['room_id']) . '&date=' . h($row['date']) . '&building_id=' . h($row['building_id'])
+    ];
 }
 
 header('Content-Type: application/json');

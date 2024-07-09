@@ -4,29 +4,47 @@ require_once 'config.php';
 require_once 'functions.php';
 generate_csrf_token();
 
+$conn = get_db_connection();
+
+$error_message = '';
+$success_message = '';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'])) {
         die('CSRF token validation failed');
     }
     $userid = $_POST['userid'];
     $username = $_POST['username'];
-    $password = password_hash($_POST['password'], PASSWORD_BCRYPT);
-
-    $conn = get_db_connection();
-
-    $sql = "INSERT INTO users (userid, username, password, is_admin) VALUES (?, ?, ?, 0)";
-    $stmt = $conn->prepare($sql);
-    $stmt->bind_param('sss', $userid, $username, $password);
-
-    if ($stmt->execute()) {
-        echo "<script>alert('登録が完了しました'); window.location.href='login.php';</script>";
+    $password = $_POST['password'];
+    
+    // 入力値の検証
+    if (empty($userid) || empty($username) || empty($password)) {
+        $error_message = "全てのフィールドを入力してください。";
     } else {
-        $error_message = "Error: " . $stmt->error;
-    }
+        // ユーザーIDの重複チェック
+        $stmt = $conn->prepare("SELECT * FROM users WHERE userid = ?");
+        $stmt->bind_param('s', $userid);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        if ($result->num_rows > 0) {
+            $error_message = "このユーザーIDは既に使用されています。";
+        } else {
+            $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-    $stmt->close();
-    $conn->close();
+            $sql = "INSERT INTO users (userid, username, password, is_admin) VALUES (?, ?, ?, 0)";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param('sss', $userid, $username, $hashed_password);
+
+            if ($stmt->execute()) {
+                $success_message = "登録が完了しました。ログインしてください。";
+            } else {
+                $error_message = "エラー: " . $stmt->error;
+            }
+        }
+        $stmt->close();
+    }
 }
+$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -64,20 +82,25 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <h2 class="text-center">ユーザー登録</h2>
-                <?php if (isset($error_message)): ?>
+                <?php if ($error_message): ?>
                     <div class="alert alert-danger" role="alert">
-                        <?php echo htmlspecialchars($error_message); ?>
+                        <?php echo h($error_message); ?>
+                    </div>
+                <?php endif; ?>
+                <?php if ($success_message): ?>
+                    <div class="alert alert-success" role="alert">
+                        <?php echo h($success_message); ?>
                     </div>
                 <?php endif; ?>
                 <form method="post" action="register_user.php">
-                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                    <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
                     <div class="form-group">
                         <label for="userid">ユーザーID</label>
-                        <input type="text" class="form-control" name="userid" id="userid" required>
+                        <input type="text" class="form-control" name="userid" id="userid" required value="<?php echo isset($_POST['userid']) ? h($_POST['userid']) : ''; ?>">
                     </div>
                     <div class="form-group">
                         <label for="username">ユーザー名</label>
-                        <input type="text" class="form-control" name="username" id="username" required>
+                        <input type="text" class="form-control" name="username" id="username" required value="<?php echo isset($_POST['username']) ? h($_POST['username']) : ''; ?>">
                     </div>
                     <div class="form-group">
                         <label for="password">パスワード</label>

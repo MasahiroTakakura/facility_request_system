@@ -1,76 +1,68 @@
 <?php
 session_start();
+require_once 'config.php';
+require_once 'functions.php';
+require_once 'vendor/autoload.php'; // PhpSpreadsheetのオートロード
+
+use PhpOffice\PhpSpreadsheet\IOFactory;
+
 if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header("Location: login.php");
     exit();
 }
 
-require_once 'config.php';
-require_once 'vendor/autoload.php'; // PhpSpreadsheetのオートロード
-
-use PhpOffice\PhpSpreadsheet\IOFactory;
+generate_csrf_token();
 
 $conn = get_db_connection();
 $inserted_rows = [];
-$error_message = '';
+$messages = [];
 
 function register_facility($building_name, $room_name, $date, $available_start_time, $available_end_time) {
-    global $conn, $inserted_rows, $error_message;
+    global $conn, $inserted_rows, $messages;
 
-    // Input validation
     if (empty($building_name) || empty($room_name) || empty($date) || empty($available_start_time) || empty($available_end_time)) {
-        $error_message = "全てのフィールドを入力してください。";
+        $messages[] = ['type' => 'danger', 'text' => "全てのフィールドを入力してください。"];
         return false;
     }
 
-    // Validate date format
     if (!preg_match("/^\d{4}-\d{2}-\d{2}$/", $date)) {
-        $error_message = "無効な日付形式です。YYYY-MM-DD形式で入力してください。";
+        $messages[] = ['type' => 'danger', 'text' => "無効な日付形式です。YYYY-MM-DD形式で入力してください。"];
         return false;
     }
 
-    // Validate time format
     if (!preg_match("/^(?:2[0-3]|[01][0-9]):[0-5][0-9]$/", $available_start_time) || 
         !preg_match("/^(?:2[0-3]|[01][0-9]):[0-5][0-9]$/", $available_end_time)) {
-        $error_message = "無効な時間形式です。HH:MM形式で入力してください。";
+        $messages[] = ['type' => 'danger', 'text' => "無効な時間形式です。HH:MM形式で入力してください。"];
         return false;
     }
 
-    // 建物を登録または取得
-    $sql = "SELECT id FROM buildings WHERE name = ?";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("SELECT id FROM buildings WHERE name = ?");
     $stmt->bind_param('s', $building_name);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
         $building_id = $result->fetch_assoc()['id'];
     } else {
-        $sql = "INSERT INTO buildings (name) VALUES (?)";
-        $stmt = $conn->prepare($sql);
+        $stmt = $conn->prepare("INSERT INTO buildings (name) VALUES (?)");
         $stmt->bind_param('s', $building_name);
         $stmt->execute();
         $building_id = $stmt->insert_id;
     }
 
-    // 部屋を登録または取得
-    $sql = "SELECT id FROM rooms WHERE name = ? AND building_id = ?";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("SELECT id FROM rooms WHERE name = ? AND building_id = ?");
     $stmt->bind_param('si', $room_name, $building_id);
     $stmt->execute();
     $result = $stmt->get_result();
     if ($result->num_rows > 0) {
         $room_id = $result->fetch_assoc()['id'];
     } else {
-        $sql = "INSERT INTO rooms (building_id, name) VALUES (?, ?)";
-        $stmt = $conn->prepare($sql);
+        $stmt = $conn->prepare("INSERT INTO rooms (building_id, name) VALUES (?, ?)");
         $stmt->bind_param('is', $building_id, $room_name);
         $stmt->execute();
         $room_id = $stmt->insert_id;
     }
 
-    // 利用可能時間を登録
-    $sql = "INSERT INTO room_availability (room_id, date, available_start_time, available_end_time) VALUES (?, ?, ?, ?)";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("INSERT INTO room_availability (room_id, date, available_start_time, available_end_time) VALUES (?, ?, ?, ?)");
     $stmt->bind_param('isss', $room_id, $date, $available_start_time, $available_end_time);
     $stmt->execute();
 
@@ -86,19 +78,26 @@ function register_facility($building_name, $room_name, $date, $available_start_t
 }
 
 function delete_facility($building_name, $room_name, $date) {
-    global $conn;
+    global $conn, $messages;
 
-    // 部屋の利用可能時間を削除
-    $sql = "DELETE FROM room_availability WHERE room_id = (SELECT id FROM rooms WHERE name = ? AND building_id = (SELECT id FROM buildings WHERE name = ?)) AND date = ?";
-    $stmt = $conn->prepare($sql);
+    $stmt = $conn->prepare("DELETE FROM room_availability WHERE room_id = (SELECT id FROM rooms WHERE name = ? AND building_id = (SELECT id FROM buildings WHERE name = ?)) AND date = ?");
     $stmt->bind_param('sss', $room_name, $building_name, $date);
     $stmt->execute();
+
+    if ($stmt->affected_rows > 0) {
+        $messages[] = ['type' => 'success', 'text' => "施設が正常に削除されました。"];
+    } else {
+        $messages[] = ['type' => 'danger', 'text' => "施設の削除に失敗しました。"];
+    }
 }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    if (!verify_csrf_token($_POST['csrf_token'])) {
+        die('CSRF token validation failed');
+    }
+    
     if (isset($_POST['delete_building_name'], $_POST['delete_room_name'], $_POST['delete_date'])) {
         delete_facility($_POST['delete_building_name'], $_POST['delete_room_name'], $_POST['delete_date']);
-        echo "<script>alert('施設が正常に削除されました');</script>";
     } elseif (isset($_FILES['excel_file']) && $_FILES['excel_file']['error'] == UPLOAD_ERR_OK) {
         $file = $_FILES['excel_file']['tmp_name'];
         $spreadsheet = IOFactory::load($file);
@@ -106,30 +105,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $rows = $sheet->toArray();
 
         foreach ($rows as $index => $row) {
-            if ($index == 0) continue; // ヘッダー行をスキップ
-            if (register_facility($row[0], $row[1], $row[2], $row[3], $row[4])) {
-                $inserted_rows[] = $row;
-            }
+            if ($index == 0) continue;
+            register_facility($row[0], $row[1], $row[2], $row[3], $row[4]);
         }
 
         if (!empty($inserted_rows)) {
-            echo "<script>alert('施設が正常に登録されました');</script>";
-        } else {
-            echo "<script>alert('施設の登録に失敗しました: {$error_message}');</script>";
+            $messages[] = ['type' => 'success', 'text' => "施設が正常に登録されました。"];
         }
     } elseif (isset($_POST['building_name'], $_POST['room_name'], $_POST['date'], $_POST['available_start_time'], $_POST['available_end_time'])) {
         if (register_facility($_POST['building_name'], $_POST['room_name'], $_POST['date'], $_POST['available_start_time'], $_POST['available_end_time'])) {
-            echo "<script>alert('施設が正常に登録されました');</script>";
-        } else {
-            echo "<script>alert('施設の登録に失敗しました: {$error_message}');</script>";
+            $messages[] = ['type' => 'success', 'text' => "施設が正常に登録されました。"];
         }
     }
 }
 
-// 施設一覧を取得
-$sql = "SELECT buildings.name as building_name, rooms.name as room_name, room_availability.date, room_availability.available_start_time, room_availability.available_end_time FROM buildings JOIN rooms ON buildings.id = rooms.building_id JOIN room_availability ON rooms.id = room_availability.room_id ORDER BY buildings.name, rooms.name, room_availability.date";
-$facilities = $conn->query($sql);
+$facilities = $conn->query("SELECT buildings.name as building_name, rooms.name as room_name, room_availability.date, room_availability.available_start_time, room_availability.available_end_time FROM buildings JOIN rooms ON buildings.id = rooms.building_id JOIN room_availability ON rooms.id = room_availability.room_id ORDER BY buildings.name, rooms.name, room_availability.date");
 ?>
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -138,19 +130,10 @@ $facilities = $conn->query($sql);
     <title>施設登録</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body {
-            background-color: #f8f9fa;
-        }
-        .container {
-            margin-top: 50px;
-            max-width: 800px;
-        }
-        .form-control, .btn {
-            margin-bottom: 15px;
-        }
-        .table-container {
-            margin-top: 30px;
-        }
+        body { background-color: #f8f9fa; }
+        .container { margin-top: 50px; max-width: 800px; }
+        .form-control, .btn { margin-bottom: 15px; }
+        .table-container { margin-top: 30px; }
     </style>
 </head>
 <body>
@@ -173,7 +156,15 @@ $facilities = $conn->query($sql);
 
     <div class="container">
         <h2 class="text-center">施設登録</h2>
+        
+        <?php foreach ($messages as $msg): ?>
+            <div class="alert alert-<?php echo h($msg['type']); ?>" role="alert">
+                <?php echo h($msg['text']); ?>
+            </div>
+        <?php endforeach; ?>
+
         <form method="post" enctype="multipart/form-data" action="register_facility.php">
+            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
             <div class="form-group">
                 <label for="excel_file">Excelファイルを選択</label>
                 <input type="file" class="form-control" name="excel_file" id="excel_file" accept=".xlsx, .xls">
@@ -218,16 +209,17 @@ $facilities = $conn->query($sql);
                     <tbody>
                     <?php while ($row = $facilities->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo htmlspecialchars($row['building_name']); ?></td>
-                            <td><?php echo htmlspecialchars($row['room_name']); ?></td>
-                            <td><?php echo htmlspecialchars($row['date']); ?></td>
-                            <td><?php echo htmlspecialchars($row['available_start_time']); ?></td>
-                            <td><?php echo htmlspecialchars($row['available_end_time']); ?></td>
+                            <td><?php echo h($row['building_name']); ?></td>
+                            <td><?php echo h($row['room_name']); ?></td>
+                            <td><?php echo h($row['date']); ?></td>
+                            <td><?php echo h($row['available_start_time']); ?></td>
+                            <td><?php echo h($row['available_end_time']); ?></td>
                             <td>
                                 <form method="post" action="register_facility.php" style="display:inline;">
-                                    <input type="hidden" name="delete_building_name" value="<?php echo htmlspecialchars($row['building_name']); ?>">
-                                    <input type="hidden" name="delete_room_name" value="<?php echo htmlspecialchars($row['room_name']); ?>">
-                                    <input type="hidden" name="delete_date" value="<?php echo htmlspecialchars($row['date']); ?>">
+                                    <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                                    <input type="hidden" name="delete_building_name" value="<?php echo h($row['building_name']); ?>">
+                                    <input type="hidden" name="delete_room_name" value="<?php echo h($row['room_name']); ?>">
+                                    <input type="hidden" name="delete_date" value="<?php echo h($row['date']); ?>">
                                     <button type="submit" class="btn btn-danger btn-sm">削除</button>
                                 </form>
                             </td>
@@ -239,8 +231,9 @@ $facilities = $conn->query($sql);
         <?php endif; ?>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
 </body>
 </html>
+<?php $conn->close(); ?>
