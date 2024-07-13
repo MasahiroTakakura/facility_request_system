@@ -2,12 +2,13 @@
 session_start();
 require_once 'config.php';
 require_once 'functions.php';
-generate_csrf_token();
 
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
 }
+
+generate_csrf_token();
 
 $conn = get_db_connection();
 
@@ -19,7 +20,6 @@ $sql_buildings = "SELECT * FROM buildings";
 $buildings = $conn->query($sql_buildings);
 
 $rooms = array();
-
 if ($building_id) {
     $sql_rooms = "SELECT * FROM rooms WHERE building_id = ?";
     $stmt = $conn->prepare($sql_rooms);
@@ -29,16 +29,19 @@ if ($building_id) {
     $stmt->close();
 }
 
+$message = '';
+
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'])) {
         die('CSRF token validation failed');
     }
+    
     $username = $_SESSION['username'];
-    $room_id = intval($_POST['room_id']);
+    $room_id = filter_input(INPUT_POST, 'room_id', FILTER_VALIDATE_INT);
     $usage_dates = $_POST['usage_dates'];
     $usage_start_times = $_POST['usage_start_times'];
     $usage_end_times = $_POST['usage_end_times'];
-    $reason = $_POST['reason'];
+    $reason = filter_input(INPUT_POST, 'reason', FILTER_SANITIZE_STRING);
 
     $is_valid = true;
     $errors = [];
@@ -66,7 +69,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     if (!$is_valid) {
-        $error_message = implode("<br>", $errors);
+        $message = implode("<br>", $errors);
     } else {
         $stmt = $conn->prepare("INSERT INTO requests (username, room_id, usage_dates, usage_start_times, usage_end_times, reason, status) VALUES (?, ?, ?, ?, ?, ?, '申請中')");
         foreach ($usage_dates as $index => $usage_date) {
@@ -75,7 +78,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param('sissss', $username, $room_id, $usage_date, $usage_start_time, $usage_end_time, $reason);
             $stmt->execute();
         }
-        $success_message = "リクエストは正常に送信されました";
+        $message = "リクエストは正常に送信されました";
         $stmt->close();
     }
 }
@@ -99,14 +102,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         .form-control, .btn {
             margin-bottom: 15px;
         }
-        .input-group-append .btn {
-            border-top-left-radius: 0;
-            border-bottom-left-radius: 0;
-        }
-        .input-group-prepend .btn {
-            border-top-right-radius: 0;
-            border-bottom-right-radius: 0;
-        }
     </style>
 </head>
 <body>
@@ -123,17 +118,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
     <div class="container mt-5">
         <h2 class="text-center">施設リクエストフォーム</h2>
-        <?php if (isset($error_message)): ?>
-            <div class="alert alert-danger" role="alert">
-                <?php echo $error_message; ?>
+        <?php if ($message): ?>
+            <div class="alert <?php echo strpos($message, 'エラー') !== false ? 'alert-danger' : 'alert-success'; ?>" role="alert">
+                <?php echo $message; ?>
             </div>
         <?php endif; ?>
-        <?php if (isset($success_message)): ?>
-            <div class="alert alert-success" role="alert">
-                <?php echo h($success_message); ?>
-            </div>
-        <?php endif; ?>
-        <form method="post" action="request_form.php">
+        <form method="post" action="request_form.php" id="request-form">
             <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
             <div class="form-group">
                 <label for="building_id">建物</label>
@@ -188,41 +178,31 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
         $(document).ready(function() {
-            var initialBuildingId = '<?php echo $building_id; ?>';
-            if (initialBuildingId) {
-                $.ajax({
-                    type: 'POST',
-                    url: 'get_rooms.php',
-                    data: { 
-                        building_id: initialBuildingId,
-                        csrf_token: '<?php echo h($_SESSION['csrf_token']); ?>'
-                    },
-                    success: function(html) {
-                        $('#room_id').html(html);
-                        $('#room_id').val('<?php echo $room_id; ?>');
-                        $('#room_id').prop('disabled', false);
-                    }
-                });
-            }
-
-            $('#building_id').on('change', function() {
+            $('#building_id').change(function() {
                 var building_id = $(this).val();
                 if (building_id) {
                     $.ajax({
-                        type: 'POST',
                         url: 'get_rooms.php',
+                        type: 'POST',
+                        dataType: 'json',
                         data: { 
                             building_id: building_id,
                             csrf_token: '<?php echo h($_SESSION['csrf_token']); ?>'
                         },
-                        success: function(html) {
-                            $('#room_id').html(html);
-                            $('#room_id').prop('disabled', false);
+                        success: function(response) {
+                            var options = '<option value="">部屋を選択してください</option>';
+                            $.each(response, function(index, room) {
+                                options += '<option value="' + room.id + '">' + room.name + '</option>';
+                            });
+                            $('#room_id').html(options).prop('disabled', false);
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("Error fetching rooms:", error);
+                            $('#room_id').html('<option value="">エラーが発生しました</option>').prop('disabled', true);
                         }
                     });
                 } else {
-                    $('#room_id').html('<option value="">先に建物を選択してください</option>');
-                    $('#room_id').prop('disabled', true);
+                    $('#room_id').html('<option value="">先に建物を選択してください</option>').prop('disabled', true);
                 }
             });
 

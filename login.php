@@ -2,9 +2,17 @@
 session_start();
 require_once 'config.php';
 require_once 'functions.php';
+
+// すでにログインしている場合はダッシュボードにリダイレクト
+if (isset($_SESSION['username'])) {
+    header("Location: dashboard.php");
+    exit();
+}
+
 generate_csrf_token();
 
-$conn = get_db_connection();
+$max_attempts = 5; // 最大試行回数
+$lockout_time = 15 * 60; // ロックアウト時間（秒）
 
 $error_message = '';
 
@@ -12,9 +20,13 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (!verify_csrf_token($_POST['csrf_token'])) {
         die('CSRF token validation failed');
     }
-    $userid = $_POST['userid'];
+
+    $userid = filter_input(INPUT_POST, 'userid', FILTER_SANITIZE_STRING);
     $password = $_POST['password'];
 
+    $conn = get_db_connection();
+
+    // ユーザー情報を取得
     $sql = "SELECT * FROM users WHERE userid = ?";
     $stmt = $conn->prepare($sql);
     $stmt->bind_param('s', $userid);
@@ -22,18 +34,44 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $result = $stmt->get_result();
     $user = $result->fetch_assoc();
 
-    if ($user && password_verify($password, $user['password'])) {
-        $_SESSION['username'] = $user['username'];
-        $_SESSION['is_admin'] = $user['is_admin'];
+    if ($user) {
+        // アカウントがロックされているかチェック
+        if ($user['login_attempts'] >= $max_attempts && time() - strtotime($user['last_attempt_time']) < $lockout_time) {
+            $error_message = "アカウントがロックされています。しばらく待ってから再試行してください。";
+        } else {
+            if (password_verify($password, $user['password'])) {
+                // ログイン成功
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['is_admin'] = $user['is_admin'];
 
-        // リダイレクト
-        header("Location: dashboard.php");
-        exit();
+                // ログイン試行回数をリセット
+                $reset_sql = "UPDATE users SET login_attempts = 0, last_attempt_time = NULL WHERE userid = ?";
+                $reset_stmt = $conn->prepare($reset_sql);
+                $reset_stmt->bind_param('s', $userid);
+                $reset_stmt->execute();
+                $reset_stmt->close();
+
+                header("Location: dashboard.php");
+                exit();
+            } else {
+                // ログイン失敗
+                $error_message = "ユーザーIDまたはパスワードが違います";
+
+                // ログイン試行回数を更新
+                $update_sql = "UPDATE users SET login_attempts = login_attempts + 1, last_attempt_time = CURRENT_TIMESTAMP WHERE userid = ?";
+                $update_stmt = $conn->prepare($update_sql);
+                $update_stmt->bind_param('s', $userid);
+                $update_stmt->execute();
+                $update_stmt->close();
+            }
+        }
     } else {
         $error_message = "ユーザーIDまたはパスワードが違います";
     }
+
+    $stmt->close();
+    $conn->close();
 }
-$conn->close();
 ?>
 
 <!DOCTYPE html>
@@ -48,35 +86,52 @@ $conn->close();
             background-color: #f8f9fa;
         }
         .container {
-            margin-top: 50px;
-            max-width: 400px;
+            margin-top: 100px;
         }
-        .form-control, .btn {
-            margin-bottom: 15px;
+        .card {
+            border: none;
+            border-radius: 1rem;
+            box-shadow: 0 0.5rem 1rem 0 rgba(0, 0, 0, 0.1);
+        }
+        .card-body {
+            padding: 2rem;
+        }
+        .form-group {
+            margin-bottom: 1.5rem;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2 class="text-center">ログイン</h2>
-        <?php if ($error_message): ?>
-            <div class="alert alert-danger" role="alert">
-                <?php echo h($error_message); ?>
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h2 class="text-center mb-4">ログイン</h2>
+                        <?php if ($error_message): ?>
+                            <div class="alert alert-danger" role="alert">
+                                <?php echo h($error_message); ?>
+                            </div>
+                        <?php endif; ?>
+                        <form method="post" action="login.php">
+                            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                            <div class="form-group">
+                                <label for="userid">ユーザーID</label>
+                                <input type="text" class="form-control" id="userid" name="userid" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="password">パスワード</label>
+                                <input type="password" class="form-control" id="password" name="password" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+                        </form>
+                        <div class="text-center mt-3">
+                            <a href="register.php">新規登録はこちら</a>
+                        </div>
+                    </div>
+                </div>
             </div>
-        <?php endif; ?>
-        <form method="post" action="login.php">
-            <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
-            <div class="form-group">
-                <label for="userid">ユーザーID</label>
-                <input type="text" class="form-control" id="userid" name="userid" required value="<?php echo isset($_POST['userid']) ? h($_POST['userid']) : ''; ?>">
-            </div>
-            <div class="form-group">
-                <label for="password">パスワード</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary btn-block">ログイン</button>
-            <a href="register_user.php" class="btn btn-secondary btn-block">会員登録</a>
-        </form>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
