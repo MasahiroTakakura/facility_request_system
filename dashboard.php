@@ -59,6 +59,9 @@ $conn->close();
         <div class="collapse navbar-collapse" id="navbarNavDropdown">
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
+                    <a href="edit_profile.php" class="nav-link">プロフィール編集</a>
+                </li>
+                <li class="nav-item">
                     <a class="nav-link" href="logout.php">ログアウト</a>
                 </li>
             </ul>
@@ -69,7 +72,7 @@ $conn->close();
         <h1 class="my-4">ようこそ、<?php echo h($username); ?>さん</h1>
         
         <div class="row">
-            <div class="col-md-6">
+            <div class="col-md-8">
                 <h2>最近のリクエスト</h2>
                 <?php if ($result->num_rows > 0): ?>
                     <table class="table table-striped">
@@ -80,6 +83,7 @@ $conn->close();
                                 <th>日付</th>
                                 <th>時間</th>
                                 <th>状態</th>
+                                <th>操作</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -106,6 +110,12 @@ $conn->close();
                                         ?>
                                         <span class="<?php echo $status_class; ?>"><?php echo h($row['status']); ?></span>
                                     </td>
+                                    <td>
+                                        <?php if ($row['status'] == '申請中'): ?>
+                                            <a href="edit_request.php?id=<?php echo $row['id']; ?>" class="btn btn-sm btn-primary">変更</a>
+                                            <button class="btn btn-sm btn-danger cancel-request" data-id="<?php echo $row['id']; ?>">キャンセル</button>
+                                        <?php endif; ?>
+                                    </td>
                                 </tr>
                             <?php endwhile; ?>
                         </tbody>
@@ -114,7 +124,7 @@ $conn->close();
                     <p>最近のリクエストはありません。</p>
                 <?php endif; ?>
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
                 <h2>クイックリンク</h2>
                 <ul class="list-group">
                     <li class="list-group-item">
@@ -131,8 +141,28 @@ $conn->close();
         </div>
     </div>
 
-    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        $(document).ready(function() {
+            $('.cancel-request').click(function() {
+                var requestId = $(this).data('id');
+                if (confirm('このリクエストをキャンセルしてもよろしいですか？')) {
+                    $.post('cancel_request.php', { 
+                        request_id: requestId,
+                        csrf_token: '<?php echo $_SESSION['csrf_token']; ?>'
+                    }, function(response) {
+                        if (response.success) {
+                            alert('リクエストがキャンセルされました。');
+                            location.reload();
+                        } else {
+                            alert('キャンセルに失敗しました: ' + response.message);
+                        }
+                    }, 'json');
+                }
+            });
+        });
+    </script>
 </body>
 </html>

@@ -49,23 +49,42 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         $start_time = $usage_start_times[$index];
         $end_time = $usage_end_times[$index];
 
-        $availability_query = "SELECT available_start_time, available_end_time FROM room_availability WHERE room_id = ? AND date = ?";
-        $stmt = $conn->prepare($availability_query);
-        $stmt->bind_param('is', $room_id, $usage_date);
-        $stmt->execute();
-        $stmt->bind_result($available_start_time, $available_end_time);
-        $stmt->fetch();
-        $stmt->close();
+        // 重複チェック
+        $check_sql = "SELECT id FROM requests 
+                      WHERE room_id = ? AND usage_dates = ? AND status != '却下' AND
+                      ((usage_start_times < ? AND usage_end_times > ?) OR
+                       (usage_start_times >= ? AND usage_start_times < ?) OR
+                       (usage_end_times > ? AND usage_end_times <= ?))";
+        
+        $check_stmt = $conn->prepare($check_sql);
+        $check_stmt->bind_param('isssssss', $room_id, $usage_date, $end_time, $start_time, $start_time, $end_time, $start_time, $end_time);
+        $check_stmt->execute();
+        $check_result = $check_stmt->get_result();
 
-        if ($available_start_time && $available_end_time) {
-            if ($start_time < $available_start_time || $end_time > $available_end_time || $start_time >= $end_time) {
-                $is_valid = false;
-                $errors[] = h($usage_date) . " の利用可能時間は " . h($available_start_time) . " から " . h($available_end_time) . " までです。";
-            }
-        } else {
+        if ($check_result->num_rows > 0) {
             $is_valid = false;
-            $errors[] = h($usage_date) . " は利用できません。";
+            $errors[] = h($usage_date) . " の指定された時間帯は既に予約されています。";
+        } else {
+            // 利用可能時間チェック
+            $availability_query = "SELECT available_start_time, available_end_time FROM room_availability WHERE room_id = ? AND date = ?";
+            $stmt = $conn->prepare($availability_query);
+            $stmt->bind_param('is', $room_id, $usage_date);
+            $stmt->execute();
+            $stmt->bind_result($available_start_time, $available_end_time);
+            $stmt->fetch();
+            $stmt->close();
+
+            if ($available_start_time && $available_end_time) {
+                if ($start_time < $available_start_time || $end_time > $available_end_time || $start_time >= $end_time) {
+                    $is_valid = false;
+                    $errors[] = h($usage_date) . " の利用可能時間は " . h($available_start_time) . " から " . h($available_end_time) . " までです。";
+                }
+            } else {
+                $is_valid = false;
+                $errors[] = h($usage_date) . " は利用できません。";
+            }
         }
+        $check_stmt->close();
     }
 
     if (!$is_valid) {

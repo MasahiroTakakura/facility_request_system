@@ -20,9 +20,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 
     $request_id = filter_input(INPUT_POST, 'request_id', FILTER_VALIDATE_INT);
-    $action = filter_input(INPUT_POST, 'action', FILTER_SANITIZE_STRING);
+    $action = $_POST['action'] ?? '';
+    $action = htmlspecialchars($action, ENT_QUOTES, 'UTF-8');
 
-    if ($request_id === false || $action === false) {
+    if ($request_id === false || !in_array($action, ['Approve', 'Reject'])) {
         $message = "Invalid input.";
     } else {
         $status = ($action == 'Approve') ? '承認済み' : '却下';
@@ -134,6 +135,11 @@ $conn->close();
         <?php else: ?>
             <p class="text-center">現在、承認待ちのリクエストはありません。</p>
         <?php endif; ?>
+
+        <!-- 管理者ダッシュボードへ戻るボタン -->
+        <div class="text-center mt-4">
+            <a href="admin_dashboard.php" class="btn btn-primary">管理者ダッシュボードへ戻る</a>
+        </div>
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>

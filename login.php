@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if ($user) {
         // アカウントがロックされているかチェック
         if ($user['login_attempts'] >= $max_attempts && time() - strtotime($user['last_attempt_time']) < $lockout_time) {
-            $error_message = "アカウントがロックされています。しばらく待ってから再試行してください。";
+            $error_message = "アカウントが一時的にロックされています。しばらく待ってから再試行してください。";
         } else {
             if (password_verify($password, $user['password'])) {
                 // ログイン成功
@@ -55,7 +55,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 exit();
             } else {
                 // ログイン失敗
-                $error_message = "ユーザーIDまたはパスワードが違います";
+                $error_message = "ユーザーIDまたはパスワードが正しくありません。";
 
                 // ログイン試行回数を更新
                 $update_sql = "UPDATE users SET login_attempts = login_attempts + 1, last_attempt_time = CURRENT_TIMESTAMP WHERE userid = ?";
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         }
     } else {
-        $error_message = "ユーザーIDまたはパスワードが違います";
+        $error_message = "ユーザーIDまたはパスワードが正しくありません。";
     }
 
     $stmt->close();
@@ -79,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ログイン</title>
+    <title>ログイン - 施設予約システム</title>
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
@@ -126,7 +126,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <button type="submit" class="btn btn-primary btn-block">ログイン</button>
                         </form>
                         <div class="text-center mt-3">
-                            <a href="register.php">新規登録はこちら</a>
+                            <a href="register_user.php">新規登録はこちら</a>
+                        </div>
+                        <div class="text-center mt-2">
+                            <a href="forgot_password.php">パスワードを忘れた場合</a>
                         </div>
                     </div>
                 </div>
