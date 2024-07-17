@@ -34,6 +34,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if ($stmt->execute()) {
             $message = "リクエストが" . h($status) . "されました。";
+            
+            // リクエストのユーザー名を取得
+            $user_query = "SELECT username FROM requests WHERE id = ?";
+            $user_stmt = $conn->prepare($user_query);
+            $user_stmt->bind_param('i', $request_id);
+            $user_stmt->execute();
+            $user_result = $user_stmt->get_result();
+            $user = $user_result->fetch_assoc();
+            $user_stmt->close();
+
+            // 通知を作成
+            $notification_message = "あなたのリクエスト（ID: {$request_id}）が{$status}されました。";
+            create_notification($user['username'], $notification_message);
         } else {
             $message = "エラー: " . h($stmt->error);
         }

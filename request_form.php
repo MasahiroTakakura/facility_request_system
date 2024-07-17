@@ -37,11 +37,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
     
     $username = $_SESSION['username'];
-    $room_id = filter_input(INPUT_POST, 'room_id', FILTER_VALIDATE_INT);
-    $usage_dates = $_POST['usage_dates'];
-    $usage_start_times = $_POST['usage_start_times'];
-    $usage_end_times = $_POST['usage_end_times'];
-    $reason = filter_input(INPUT_POST, 'reason', FILTER_SANITIZE_STRING);
+    $room_id = isset($_POST['room_id']) ? intval($_POST['room_id']) : 0;
+    $usage_dates = $_POST['usage_dates'] ?? [];
+    $usage_start_times = $_POST['usage_start_times'] ?? [];
+    $usage_end_times = $_POST['usage_end_times'] ?? [];
+    $reason = htmlspecialchars($_POST['reason'] ?? '', ENT_QUOTES, 'UTF-8');
 
     $is_valid = true;
     $errors = [];

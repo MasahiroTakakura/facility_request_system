@@ -36,6 +36,9 @@ $stmt->bind_param('s', $username);
 $stmt->execute();
 $result = $stmt->get_result();
 
+// ユーザーの通知を取得
+$notifications = get_user_notifications($username);
+
 $conn->close();
 ?>
 
@@ -125,7 +128,26 @@ $conn->close();
                 <?php endif; ?>
             </div>
             <div class="col-md-4">
-                <h2>クイックリンク</h2>
+                <h2>通知</h2>
+                <?php if (empty($notifications)): ?>
+                    <p>新しい通知はありません。</p>
+                <?php else: ?>
+                    <ul class="list-group">
+                        <?php foreach ($notifications as $notification): ?>
+                            <li class="list-group-item">
+                                <?php echo h($notification['message']); ?>
+                                <small class="text-muted d-block"><?php echo h($notification['created_at']); ?></small>
+                                <form method="post" action="mark_notification_read.php" class="mt-2">
+                                    <input type="hidden" name="csrf_token" value="<?php echo h($_SESSION['csrf_token']); ?>">
+                                    <input type="hidden" name="notification_id" value="<?php echo h($notification['id']); ?>">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">既読にする</button>
+                                </form>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+
+                <h2 class="mt-4">クイックリンク</h2>
                 <ul class="list-group">
                     <li class="list-group-item">
                         <a href="request_form.php" class="btn btn-primary btn-block">新規リクエスト</a>
