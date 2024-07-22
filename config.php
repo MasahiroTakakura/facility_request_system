@@ -14,4 +14,7 @@ function get_db_connection() {
     }
     return $conn;
 }
+
+define('SESSION_TIMEOUT', 30 * 60); // 30分でタイムアウト
+
 ?>

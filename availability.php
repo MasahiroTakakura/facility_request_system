@@ -4,6 +4,11 @@ require_once 'config.php';
 require_once 'functions.php';
 generate_csrf_token();
 
+if (!check_session_timeout()) {
+    header("Location: login.php?timeout=1");
+    exit();
+}
+
 if (!isset($_SESSION['username'])) {
     header("Location: login.php");
     exit();
@@ -188,5 +193,20 @@ $conn->close();
             }
         });
     </script>
+
+<script>
+    // 5分ごとにセッションをチェック
+    setInterval(function() {
+        fetch('check_session.php')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid) {
+                    alert('セッションがタイムアウトしました。再度ログインしてください。');
+                    window.location.href = 'login.php?timeout=1';
+                }
+            });
+    }, 5 * 60 * 1000);
+</script>
+
 </body>
 </html>

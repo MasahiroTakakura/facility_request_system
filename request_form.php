@@ -115,17 +115,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             background-color: #f8f9fa;
         }
         .container {
-            max-width: 800px;
-            margin-top: 50px;
+            max-width: 100%;
+            padding: 15px;
         }
-        .form-control, .btn {
-            margin-bottom: 15px;
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        .btn {
+            margin-bottom: 0.5rem;
+            width: 100%;
+        }
+        .input-group {
+            flex-wrap: wrap;
+        }
+        .input-group > * {
+            flex: 1 1 100%;
+            margin-bottom: 0.5rem;
+        }
+        @media (min-width: 768px) {
+            .container {
+                max-width: 800px;
+            }
+            .input-group > * {
+                flex: 1 1 auto;
+                margin-bottom: 0;
+            }
+            .btn {
+                width: auto;
+            }
+        }
+        .sticky-nav {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            background-color: #f8f9fa;
         }
     </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-light bg-light">
-        <a class="navbar-brand" href="#">施設リクエストシステム</a>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light sticky-nav">
+        <a class="navbar-brand" href="#">施設リクエスト</a>
+        <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
         <div class="collapse navbar-collapse" id="navbarNav">
             <ul class="navbar-nav ml-auto">
                 <li class="nav-item">
@@ -135,8 +167,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         </div>
     </nav>
 
-    <div class="container mt-5">
-        <h2 class="text-center">施設リクエストフォーム</h2>
+    <div class="container mt-3">
+        <h2 class="text-center mb-4">施設リクエストフォーム</h2>
         <?php if ($message): ?>
             <div class="alert <?php echo strpos($message, 'エラー') !== false ? 'alert-danger' : 'alert-success'; ?>" role="alert">
                 <?php echo $message; ?>
@@ -181,14 +213,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     </div>
                 </div>
             </div>
-            <button type="button" id="add-schedule" class="btn btn-success btn-block">使用スケジュールを追加</button>
-            <div class="form-group">
+            <button type="button" id="add-schedule" class="btn btn-success">使用スケジュールを追加</button>
+            <div class="form-group mt-3">
                 <label for="reason">理由</label>
                 <textarea class="form-control" name="reason" id="reason" rows="3" placeholder="理由を入力してください" required></textarea>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">送信</button>
-            <a href="availability.php" class="btn btn-secondary btn-block">空き状況確認に戻る</a>
-            <a href="dashboard.php" class="btn btn-info btn-block">ダッシュボードに戻る</a>
+            <button type="submit" class="btn btn-primary">送信</button>
+            <a href="availability.php" class="btn btn-secondary">空き状況確認</a>
+            <a href="dashboard.php" class="btn btn-info">ダッシュボード</a>
         </form>
     </div>
 
@@ -233,7 +265,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                             <input type="time" class="form-control" name="usage_start_times[]" required>
                             <input type="time" class="form-control" name="usage_end_times[]" required>
                             <div class="input-group-append">
-                            <button type="button" class="btn btn-danger remove-schedule">削除</button>
+                                <button type="button" class="btn btn-danger remove-schedule">削除</button>
                             </div>
                         </div>
                     </div>`;
@@ -242,6 +274,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
             $(document).on('click', '.remove-schedule', function() {
                 $(this).closest('.form-group').remove();
+            });
+
+            // スムーズスクロール
+            $('a[href^="#"]').on('click', function(event) {
+                var target = $(this.getAttribute('href'));
+                if( target.length ) {
+                    event.preventDefault();
+                    $('html, body').stop().animate({
+                        scrollTop: target.offset().top - 70
+                    }, 1000);
+                }
             });
         });
     </script>

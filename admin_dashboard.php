@@ -4,6 +4,11 @@ require_once 'config.php';
 require_once 'functions.php';
 generate_csrf_token();
 
+if (!check_session_timeout()) {
+    header("Location: login.php?timeout=1");
+    exit();
+}
+
 if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
     header("Location: login.php");
     exit();
@@ -141,6 +146,19 @@ $result = $conn->query($sql);
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+    // 5分ごとにセッションをチェック
+    setInterval(function() {
+        fetch('check_session.php')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid) {
+                    alert('セッションがタイムアウトしました。再度ログインしてください。');
+                    window.location.href = 'login.php?timeout=1';
+                }
+            });
+    }, 5 * 60 * 1000);
+</script>
 </body>
 </html>
 

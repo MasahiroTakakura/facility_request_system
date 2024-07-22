@@ -48,4 +48,19 @@ function mark_notification_as_read($notification_id) {
     $stmt->close();
     $conn->close();
 }
+
+function check_session_timeout() {
+    $current_time = time();
+    $session_lifetime = isset($_SESSION['LAST_ACTIVITY']) ? $current_time - $_SESSION['LAST_ACTIVITY'] : 0;
+    
+    if ($session_lifetime > SESSION_TIMEOUT) {
+        session_unset();
+        session_destroy();
+        return false;
+    }
+    
+    $_SESSION['LAST_ACTIVITY'] = $current_time;
+    return true;
+}
+
 ?>

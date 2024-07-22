@@ -9,6 +9,12 @@ if (!isset($_SESSION['username']) || !isset($_SESSION['is_admin']) || !$_SESSION
     exit();
 }
 
+// セッションタイムアウトチェック
+if (!check_session_timeout()) {
+    header("Location: login.php?timeout=1");
+    exit();
+}
+
 generate_csrf_token();
 
 $conn = get_db_connection();
@@ -28,27 +34,53 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     } else {
         $status = ($action == 'Approve') ? '承認済み' : '却下';
 
-        $sql = "UPDATE requests SET status = ? WHERE id = ?";
-        $stmt = $conn->prepare($sql);
-        $stmt->bind_param('si', $status, $request_id);
+        // トランザクション開始
+        $conn->begin_transaction();
 
-        if ($stmt->execute()) {
-            $message = "リクエストが" . h($status) . "されました。";
-            
-            // リクエストのユーザー名を取得
-            $user_query = "SELECT username FROM requests WHERE id = ?";
-            $user_stmt = $conn->prepare($user_query);
-            $user_stmt->bind_param('i', $request_id);
-            $user_stmt->execute();
-            $user_result = $user_stmt->get_result();
-            $user = $user_result->fetch_assoc();
-            $user_stmt->close();
+        try {
+            // リクエストのステータス更新
+            $sql = "UPDATE requests SET status = ? WHERE id = ?";
+            $stmt = $conn->prepare($sql);
+            $stmt->bind_param('si', $status, $request_id);
+            $stmt->execute();
 
-            // 通知を作成
-            $notification_message = "あなたのリクエスト（ID: {$request_id}）が{$status}されました。";
-            create_notification($user['username'], $notification_message);
-        } else {
-            $message = "エラー: " . h($stmt->error);
+            if ($stmt->affected_rows > 0) {
+                // リクエストのユーザー名を取得
+                $user_query = "SELECT username FROM requests WHERE id = ?";
+                $user_stmt = $conn->prepare($user_query);
+                $user_stmt->bind_param('i', $request_id);
+                $user_stmt->execute();
+                $user_result = $user_stmt->get_result();
+                $user = $user_result->fetch_assoc();
+                $user_stmt->close();
+
+                // ユーザー名からユーザーIDを取得
+                $user_id_query = "SELECT id FROM users WHERE username = ?";
+                $user_id_stmt = $conn->prepare($user_id_query);
+                $user_id_stmt->bind_param('s', $user['username']);
+                $user_id_stmt->execute();
+                $user_id_result = $user_id_stmt->get_result();
+                $user_id_data = $user_id_result->fetch_assoc();
+                $user_id_stmt->close();
+
+                if ($user_id_data) {
+                    $user_id = $user_id_data['id'];
+                    $notification_message = "あなたのリクエスト（ID: {$request_id}）が{$status}されました。";
+                    create_notification($user_id, $notification_message);
+                } else {
+                    // ユーザーIDが見つからない場合のエラー処理
+                    throw new Exception("User ID not found for username: " . $user['username']);
+                }
+
+                $conn->commit();
+                $message = "リクエストが" . h($status) . "されました。";
+            } else {
+                throw new Exception('リクエストの更新に失敗しました。');
+            }
+        } catch (Exception $e) {
+            $conn->rollback();
+            $message = 'エラー: ' . h($e->getMessage());
+            error_log('Approve request error: ' . $e->getMessage());
         }
 
         $stmt->close();
@@ -158,5 +190,19 @@ $conn->close();
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    
+    <!-- セッションタイムアウトチェック用のJavaScript -->
+    <script>
+    setInterval(function() {
+        fetch('check_session.php')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid) {
+                    alert('セッションがタイムアウトしました。再度ログインしてください。');
+                    window.location.href = 'login.php?timeout=1';
+                }
+            });
+    }, 5 * 60 * 1000); // 5分ごとにチェック
+    </script>
 </body>
 </html>

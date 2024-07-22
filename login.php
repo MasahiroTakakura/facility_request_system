@@ -3,10 +3,21 @@ session_start();
 require_once 'config.php';
 require_once 'functions.php';
 
-// すでにログインしている場合はダッシュボードにリダイレクト
+// 既にログインしている場合はダッシュボードにリダイレクト
 if (isset($_SESSION['username'])) {
-    header("Location: dashboard.php");
-    exit();
+    if (check_session_timeout()) {
+        header("Location: dashboard.php");
+        exit();
+    } else {
+        // セッションタイムアウトの場合、セッションを破棄
+        session_unset();
+        session_destroy();
+    }
+}
+
+// タイムアウトによるリダイレクトの場合、メッセージを表示
+if (isset($_GET['timeout']) && $_GET['timeout'] == 1) {
+    $error_message = "セッションがタイムアウトしました。再度ログインしてください。";
 }
 
 generate_csrf_token();
@@ -43,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 // ログイン成功
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['is_admin'] = $user['is_admin'];
+                $_SESSION['LAST_ACTIVITY'] = time();
 
                 // ログイン試行回数をリセット
                 $reset_sql = "UPDATE users SET login_attempts = 0, last_attempt_time = NULL WHERE userid = ?";

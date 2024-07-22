@@ -5,6 +5,11 @@ require_once 'functions.php';
 
 generate_csrf_token();
 
+if (!check_session_timeout()) {
+    header("Location: login.php?timeout=1");
+    exit();
+}
+
 $message = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
@@ -88,5 +93,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
         </div>
     </div>
+    <script>
+    // 5分ごとにセッションをチェック
+    setInterval(function() {
+        fetch('check_session.php')
+            .then(response => response.json())
+            .then(data => {
+                if (!data.valid) {
+                    alert('セッションがタイムアウトしました。再度ログインしてください。');
+                    window.location.href = 'login.php?timeout=1';
+                }
+            });
+    }, 5 * 60 * 1000);
+</script>
 </body>
 </html>
